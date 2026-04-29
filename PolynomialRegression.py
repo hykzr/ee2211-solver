@@ -25,7 +25,7 @@ def fit_polynomial_regression(X, y, order):
 
 
 def predict_polynomial_regression(poly, w, X_test):
-    P_test = poly.fit_transform(X_test)
+    P_test = poly.transform(X_test)
     pretty_print_array("transformed test sample P_test", P_test)
     print("")
     y_predicted = P_test @ w

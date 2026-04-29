@@ -5,6 +5,14 @@ from traceback import print_exc
 import numpy as np
 
 from CommonUtils import add_bias_column, ensure_2d, pretty_print_array, validate_same_feature_count, validate_same_sample_count
+from DecisionTreeUtils import (
+	print_classification_impurity_summary,
+	print_regression_split_candidates,
+	print_regression_threshold_summary,
+	regression_threshold_summary,
+	find_best_regression_split,
+)
+from GradientDescent import gradient_descent, infer_variables, print_gradient_descent_result
 
 from LinearRegression import linear_regression
 from OneHotLinearClassification import (
@@ -30,6 +38,9 @@ MENU_TEXT = """EE2211 Solver
 | 7. One-hot polynomial classification                   |
 | 8. Pearson correlation                                 |
 | 9. Show cached input/result                            |
+| 10. Gradient descent                                   |
+| 11. Classification tree impurity                       |
+| 12. Regression tree MSE/split                          |
 +--------------------------------------------------------+"""
 
 INPUT_HELP = (
@@ -281,6 +292,19 @@ def prompt_choice(prompt, options, default=None):
 		if raw in normalized:
 			return normalized[raw]
 		print(f"Please choose one of: {options_text}.")
+
+
+def prompt_optional_float(prompt):
+	raw = input(f"{prompt} [skip]: ").strip()
+	if not raw:
+		return None
+	try:
+		return float(raw)
+	except ValueError:
+		print("Please enter a numeric value or leave blank to skip.")
+		return prompt_optional_float(prompt)
+
+
 def inspect_array():
 	array = input_array("array")
 	cache_result(array)
@@ -410,7 +434,65 @@ def run_pearson_correlation():
 		raise ValueError(
 			f"Pearson correlation expects matching observation counts: X has {X.shape[1]}, Y has {Y.shape[1]}."
 		)
-	pearson_correlation(X, Y)
+	cache_result(pearson_correlation(X, Y))
+
+
+def run_gradient_descent():
+	print_section("Gradient Descent")
+	print("Use Python/SymPy syntax, e.g. x**2 + x*y**2 or sin(w)**2.")
+	cost_expression = input("Cost function C(...): ").strip()
+	if not cost_expression:
+		raise ValueError("Cost function is required.")
+
+	inferred_variables = infer_variables(cost_expression)
+	default_variables = ",".join(inferred_variables)
+	variable_text = input(f"Variables in update order [{default_variables}]: ").strip()
+	variables = [item.strip() for item in variable_text.split(",") if item.strip()] if variable_text else inferred_variables
+	if not variables:
+		raise ValueError("Could not infer variables. Please enter them manually.")
+
+	initial_values = input_array("initial values, one per variable").reshape(-1)
+	learning_rate = prompt_float("Learning rate", default=0.1)
+	iterations = prompt_int("Number of iterations", default=1, minimum=1)
+	tolerance = prompt_optional_float("Tolerance")
+	expression, gradient_expressions, history = gradient_descent(
+		cost_expression,
+		variables=variables,
+		initial_values=initial_values,
+		learning_rate=learning_rate,
+		iterations=iterations,
+		tolerance=tolerance,
+	)
+	print_gradient_descent_result(expression, variables, gradient_expressions, history)
+	cache_result(history[-1]["values"].reshape(-1, 1))
+
+
+def run_classification_tree_impurity():
+	print_section("Classification Tree Impurity")
+	print("Enter one row per node; columns are class counts. For a depth-1 overall impurity, enter child nodes only.")
+	class_counts = input_array("class counts by node")
+	measure = prompt_choice("Impurity measure", ["all", "gini", "entropy", "misclassification"], default="all")
+	print_classification_impurity_summary(class_counts, measure=measure)
+
+
+def run_regression_tree_mse():
+	print_section("Regression Tree MSE/Split")
+	print("Enter one-dimensional x values and matching y values. A threshold uses left: x <= threshold, right: x > threshold.")
+	X = input_array("x values")
+	Y = input_array("y values")
+	validate_same_sample_count(X, Y)
+	threshold = prompt_optional_float("Decision threshold")
+	if threshold is not None:
+		summary = regression_threshold_summary(X, Y, threshold)
+		print_regression_threshold_summary(summary)
+		cache_result([[summary["root_mse"]], [summary["overall_mse"]]])
+
+	if prompt_yes_no("Find best one-level regression-tree split", default=threshold is None):
+		best, summaries = find_best_regression_split(X, Y)
+		print_regression_split_candidates(summaries)
+		print("Best split:")
+		print_regression_threshold_summary(best)
+		cache_result([[best["threshold"]], [best["overall_mse"]]])
 
 
 def show_cache():
@@ -455,6 +537,18 @@ def process_input():
 		"corr": run_pearson_correlation,
 		"9": show_cache,
 		"cache": show_cache,
+		"10": run_gradient_descent,
+		"gd": run_gradient_descent,
+		"gradient": run_gradient_descent,
+		"gradient descent": run_gradient_descent,
+		"11": run_classification_tree_impurity,
+		"gini": run_classification_tree_impurity,
+		"entropy": run_classification_tree_impurity,
+		"impurity": run_classification_tree_impurity,
+		"12": run_regression_tree_mse,
+		"tree mse": run_regression_tree_mse,
+		"regression tree": run_regression_tree_mse,
+		"split": run_regression_tree_mse,
 	}
 
 	if option in {"0", "exit", "quit", "q"}:

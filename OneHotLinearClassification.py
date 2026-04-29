@@ -102,7 +102,7 @@ def fit_onehot_polynomialclassification(X, y, order):
 
 
 def predict_onehot_polynomialclassification(poly, w, X_test, class_labels=None):
-    P_test = poly.fit_transform(X_test)
+    P_test = poly.transform(X_test)
     print_value("P_test", P_test)
     y_predicted = P_test @ w
     print_value("y_predicted", y_predicted)
