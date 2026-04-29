@@ -1,0 +1,491 @@
+import ast
+import os
+from traceback import print_exc
+
+import numpy as np
+
+from CommonUtils import add_bias_column, ensure_2d, pretty_print_array, validate_same_feature_count, validate_same_sample_count
+
+from LinearRegression import linear_regression
+from OneHotLinearClassification import (
+	fit_onehot_linearclassification,
+	fit_onehot_polynomialclassification,
+	predict_onehot_linearclassification,
+	predict_onehot_polynomialclassification,
+)
+from PolynomialRegression import fit_polynomial_regression, predict_polynomial_regression
+from RidgePolynomialRegression import fit_ridge_poly_regression, predict_ridge_poly_regression
+from RidgeRegression import fit_ridge_regression, predict_ridge_regression
+from pearson_correlation import pearson_correlation
+
+
+MENU_TEXT = """EE2211 Solver
+| 0. Exit                                                |
+| 1. Parse and inspect array                             |
+| 2. Linear regression                                   |
+| 3. Polynomial regression                               |
+| 4. Ridge regression                                    |
+| 5. Ridge polynomial regression                         |
+| 6. One-hot linear classification                       |
+| 7. One-hot polynomial classification                   |
+| 8. Pearson correlation                                 |
+| 9. Show cached input/result                            |
++--------------------------------------------------------+"""
+
+INPUT_HELP = (
+	"Input format: one row per line using commas or spaces, finish with an empty line.\n"
+	"You may also paste Python-style arrays such as [[1, 2], [3, 4]].\n"
+	"Shortcuts: '-' uses the last input array, '_' uses the last result array."
+)
+
+LAST_INPUT = None
+LAST_RESULT = None
+VERBOSE = False
+
+
+def clear():
+	os.system("cls" if os.name == "nt" else "clear")
+
+
+def print_section(title):
+	print(f"\n{title}\n{'=' * len(title)}")
+
+def parse_numeric_array(raw_text):
+	text = raw_text.strip()
+	if not text:
+		raise ValueError("Input is empty.")
+
+	if text.startswith("[") or text.startswith("("):
+		parsed = ast.literal_eval(text)
+		return ensure_2d(parsed)
+
+	rows = []
+	for line in text.replace(";", "\n").splitlines():
+		stripped = line.strip()
+		if not stripped:
+			continue
+		if "," in stripped:
+			parts = [part.strip() for part in stripped.split(",") if part.strip()]
+		else:
+			parts = [part for part in stripped.split() if part]
+		rows.append([float(part) for part in parts])
+
+	if not rows:
+		raise ValueError("No numeric rows were found.")
+
+	widths = {len(row) for row in rows}
+	if len(widths) != 1:
+		raise ValueError("All rows must have the same number of values.")
+
+	return ensure_2d(rows)
+
+
+def parse_mixed_array(raw_text):
+	try:
+		return parse_numeric_array(raw_text)
+	except (SyntaxError, ValueError):
+		text = raw_text.strip()
+		if not text:
+			raise ValueError("Input is empty.")
+
+		if text.startswith("[") or text.startswith("("):
+			parsed = ast.literal_eval(text)
+			arr = np.asarray(parsed, dtype=object)
+			if arr.ndim == 0:
+				return arr.reshape(1, 1)
+			if arr.ndim == 1:
+				return arr.reshape(-1, 1)
+			return arr
+
+		rows = []
+		for line in text.replace(";", "\n").splitlines():
+			stripped = line.strip()
+			if not stripped:
+				continue
+			if "," in stripped:
+				parts = [part.strip() for part in stripped.split(",") if part.strip()]
+			else:
+				parts = [stripped]
+			rows.append(parts)
+
+		if not rows:
+			raise ValueError("No rows were found.")
+
+		widths = {len(row) for row in rows}
+		if len(widths) != 1:
+			raise ValueError("All rows must have the same number of values.")
+
+		return np.asarray(rows, dtype=object)
+
+
+def print_array(name, array):
+	pretty_print_array(name, array)
+
+
+def cache_input(array):
+	global LAST_INPUT
+	LAST_INPUT = ensure_2d(array)
+	return LAST_INPUT
+
+
+def cache_result(array):
+	global LAST_RESULT
+	LAST_RESULT = ensure_2d(array)
+	return LAST_RESULT
+
+
+def input_array(name, allow_last_result=True):
+	print_section(f"Input {name}")
+	if VERBOSE:
+		print(INPUT_HELP)
+	lines = []
+
+	while True:
+		line = input("> ").strip().replace("−", "-")
+		if not line:
+			if lines:
+				break
+			print("Enter at least one row.")
+			continue
+
+		if not lines and line == "-":
+			if LAST_INPUT is None:
+				print("No cached input is available.")
+				continue
+			return cache_input(LAST_INPUT)
+
+		if not lines and line == "_" and allow_last_result:
+			if LAST_RESULT is None:
+				print("No cached result is available.")
+				continue
+			return cache_input(LAST_RESULT)
+
+		lines.append(line)
+
+	try:
+		return cache_input(parse_numeric_array("\n".join(lines)))
+	except (SyntaxError, ValueError) as exc:
+		print(f"Input error: {exc}")
+		return input_array(name, allow_last_result=allow_last_result)
+
+
+def input_optional_array(name, allow_last_result=True):
+	print_section(f"Input {name}")
+	if VERBOSE:
+		print(INPUT_HELP)
+	print("Leave the first line empty to skip this input and return to the main menu after fitting.")
+	lines = []
+
+	while True:
+		line = input("> ").strip().replace("−", "-")
+		if not line:
+			if not lines:
+				return None
+			break
+
+		if not lines and line == "-":
+			if LAST_INPUT is None:
+				print("No cached input is available.")
+				continue
+			return cache_input(LAST_INPUT)
+
+		if not lines and line == "_" and allow_last_result:
+			if LAST_RESULT is None:
+				print("No cached result is available.")
+				continue
+			return cache_input(LAST_RESULT)
+
+		lines.append(line)
+
+	try:
+		return cache_input(parse_numeric_array("\n".join(lines)))
+	except (SyntaxError, ValueError) as exc:
+		print(f"Input error: {exc}")
+		return input_optional_array(name, allow_last_result=allow_last_result)
+
+
+def input_target_array(name):
+	print_section(f"Input {name}")
+	if VERBOSE:
+		print(INPUT_HELP)
+	print("For classification targets, you may enter one-hot rows or labels such as class1;class2;class3.")
+	lines = []
+
+	while True:
+		line = input("> ").strip().replace("−", "-")
+		if not line:
+			if lines:
+				break
+			print("Enter at least one row.")
+			continue
+		lines.append(line)
+
+	try:
+		return parse_mixed_array("\n".join(lines))
+	except (SyntaxError, ValueError) as exc:
+		print(f"Input error: {exc}")
+		return input_target_array(name)
+
+
+def prompt_float(prompt, default=None):
+	while True:
+		suffix = f" [{default}]" if default is not None else ""
+		raw = input(f"{prompt}{suffix}: ").strip()
+		if not raw and default is not None:
+			return float(default)
+		try:
+			return float(raw)
+		except ValueError:
+			print("Please enter a numeric value.")
+
+
+def prompt_int(prompt, default=None, minimum=None):
+	while True:
+		suffix = f" [{default}]" if default is not None else ""
+		raw = input(f"{prompt}{suffix}: ").strip()
+		if not raw and default is not None:
+			value = int(default)
+		else:
+			try:
+				value = int(raw)
+			except ValueError:
+				print("Please enter an integer.")
+				continue
+		if minimum is not None and value < minimum:
+			print(f"Please enter an integer greater than or equal to {minimum}.")
+			continue
+		return value
+
+
+def prompt_yes_no(prompt, default=True):
+	default_text = "Y/n" if default else "y/N"
+	while True:
+		raw = input(f"{prompt} [{default_text}]: ").strip().lower()
+		if not raw:
+			return default
+		if raw in {"y", "yes"}:
+			return True
+		if raw in {"n", "no"}:
+			return False
+		print("Please enter y or n.")
+
+
+def prompt_choice(prompt, options, default=None):
+	normalized = {option.lower(): option for option in options}
+	options_text = "/".join(options)
+	while True:
+		suffix = f" [{default}]" if default is not None else ""
+		raw = input(f"{prompt} ({options_text}){suffix}: ").strip().lower()
+		if not raw and default is not None:
+			return default
+		if raw in normalized:
+			return normalized[raw]
+		print(f"Please choose one of: {options_text}.")
+def inspect_array():
+	array = input_array("array")
+	cache_result(array)
+	print_array("array", array)
+
+
+def run_linear_regression():
+	X = input_array("X")
+	Y = input_array("Y")
+	validate_same_sample_count(X, Y)
+
+	X_model = add_bias_column(X)
+
+	_, w, _, _, _ = linear_regression(X_model, Y)
+	cache_result(w)
+
+	X_test = input_optional_array("X_test")
+	if X_test is None:
+		return
+	validate_same_feature_count(X, X_test)
+	X_test_model = add_bias_column(X_test)
+	y_predicted = X_test_model @ w
+	pretty_print_array("y_predicted", y_predicted, show_python=False, show_rank=False)
+	pretty_print_array("y_predicted_classified", np.sign(y_predicted), show_python=False, show_rank=False)
+	cache_result(y_predicted)
+
+
+def run_polynomial_regression():
+	X = input_array("X")
+	Y = input_array("Y")
+	validate_same_sample_count(X, Y)
+
+	order = prompt_int("Polynomial order", default=2, minimum=1)
+	print("Polynomial regression already includes the constant term. Do not add a manual offset column.")
+	poly, _, w, _, _ = fit_polynomial_regression(X, Y, order=order)
+	cache_result(w)
+
+	X_test = input_optional_array("X_test")
+	if X_test is None:
+		return
+	validate_same_feature_count(X, X_test)
+	y_predicted = predict_polynomial_regression(poly, w, X_test)
+	cache_result(y_predicted)
+
+
+def run_ridge_regression():
+	X = input_array("X")
+	Y = input_array("Y")
+	validate_same_sample_count(X, Y)
+
+	ridge_lambda = prompt_float("Lambda", default=1.0)
+	form = prompt_choice("Ridge form", ["auto", "primal form", "dual form"], default="auto")
+	X_model = add_bias_column(X)
+
+	_, _, w, _, _ = fit_ridge_regression(X_model, Y, LAMBDA=ridge_lambda, form=form)
+	cache_result(w)
+
+	X_test = input_optional_array("X_test")
+	if X_test is None:
+		return
+	validate_same_feature_count(X, X_test)
+	X_test_model = add_bias_column(X_test)
+	y_predicted = predict_ridge_regression(w, X_test_model)
+	cache_result(y_predicted)
+
+
+def run_ridge_polynomial_regression():
+	X = input_array("X")
+	Y = input_array("Y")
+	validate_same_sample_count(X, Y)
+
+	ridge_lambda = prompt_float("Lambda", default=1.0)
+	order = prompt_int("Polynomial order", default=2, minimum=1)
+	form = prompt_choice("Ridge form", ["auto", "primal form", "dual form"], default="auto")
+	print("Polynomial regression already includes the constant term. Do not add a manual offset column.")
+	poly, _, _, w, _, _ = fit_ridge_poly_regression(X, Y, LAMBDA=ridge_lambda, order=order, form=form)
+	cache_result(w)
+
+	X_test = input_optional_array("X_test")
+	if X_test is None:
+		return
+	validate_same_feature_count(X, X_test)
+	y_predicted = predict_ridge_poly_regression(poly, w, X_test)
+	cache_result(y_predicted)
+
+
+def run_onehot_linearclassification():
+	X = input_array("X")
+	Y = input_target_array("Y (one-hot or class labels)")
+	validate_same_sample_count(X, Y)
+	X_model = add_bias_column(X)
+
+	_, w, _, class_labels, _, _ = fit_onehot_linearclassification(X_model, Y)
+	cache_result(w)
+
+	X_test = input_optional_array("X_test")
+	if X_test is None:
+		return
+	validate_same_feature_count(X, X_test)
+	X_test_model = add_bias_column(X_test)
+	y_predicted = predict_onehot_linearclassification(w, X_test_model, class_labels=class_labels)
+	cache_result(y_predicted)
+
+
+def run_onehot_polynomial_classification():
+	X = input_array("X")
+	Y = input_target_array("Y (one-hot or class labels)")
+	validate_same_sample_count(X, Y)
+
+	order = prompt_int("Polynomial order", default=2, minimum=1)
+	print("Polynomial classification already includes the constant term. Do not add a manual offset column.")
+	poly, _, w, _, class_labels, _, _ = fit_onehot_polynomialclassification(X, Y, order=order)
+	cache_result(w)
+
+	X_test = input_optional_array("X_test")
+	if X_test is None:
+		return
+	validate_same_feature_count(X, X_test)
+	y_predicted = predict_onehot_polynomialclassification(poly, w, X_test, class_labels=class_labels)
+	cache_result(y_predicted)
+
+
+def run_pearson_correlation():
+	X = input_array("X")
+	Y = input_array("Y")
+	if X.shape[1] != Y.shape[1]:
+		raise ValueError(
+			f"Pearson correlation expects matching observation counts: X has {X.shape[1]}, Y has {Y.shape[1]}."
+		)
+	pearson_correlation(X, Y)
+
+
+def show_cache():
+	print_section("Cached Arrays")
+	if LAST_INPUT is None:
+		print("Last input: [empty]")
+	else:
+		print_array("last_input", LAST_INPUT)
+
+	if LAST_RESULT is None:
+		print("Last result: [empty]")
+	else:
+		print_array("last_result", LAST_RESULT)
+
+
+def process_input():
+	print(MENU_TEXT)
+	option = input("Choose an option: ").strip().lower()
+
+	actions = {
+		"1": inspect_array,
+		"inspect": inspect_array,
+		"2": run_linear_regression,
+		"linear": run_linear_regression,
+		"lin": run_linear_regression,
+		"3": run_polynomial_regression,
+		"poly": run_polynomial_regression,
+		"polynomial": run_polynomial_regression,
+		"4": run_ridge_regression,
+		"ridge": run_ridge_regression,
+		"5": run_ridge_polynomial_regression,
+		"ridgepoly": run_ridge_polynomial_regression,
+		"ridge-polynomial": run_ridge_polynomial_regression,
+		"6": run_onehot_linearclassification,
+		"onehot": run_onehot_linearclassification,
+		"classification": run_onehot_linearclassification,
+		"7": run_onehot_polynomial_classification,
+		"onehotpoly": run_onehot_polynomial_classification,
+		"polyclass": run_onehot_polynomial_classification,
+		"8": run_pearson_correlation,
+		"pearson": run_pearson_correlation,
+		"corr": run_pearson_correlation,
+		"9": show_cache,
+		"cache": show_cache,
+	}
+
+	if option in {"0", "exit", "quit", "q"}:
+		return False
+
+	action = actions.get(option)
+	if action is None:
+		print("Unknown option.")
+	else:
+		action()
+
+	input("\nPress Enter to continue...")
+	clear()
+	return True
+
+
+def main():
+	clear()
+	while True:
+		try:
+			if not process_input():
+				return
+		except KeyboardInterrupt:
+			print("\nCtrl+C detected, exiting.")
+			return
+		except Exception as exc:
+			print(f"\nERROR: {exc}")
+			print_exc()
+			input("\nPress Enter to continue...")
+			clear()
+
+
+if __name__ == "__main__":
+	main()
