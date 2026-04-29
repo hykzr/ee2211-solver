@@ -37,6 +37,9 @@ class SolverComputationTests(unittest.TestCase):
 
         with quiet_stdout():
             _, w, _, _, y_predicted = linear_regression(X, y, np.array([[1, 3]], dtype=float))
+        assert w.shape == (2, 1), f"Expected weight shape (2, 1), got {w.shape}"
+        assert y_predicted is not None, "y_predicted should not be None"
+        assert y_predicted.shape == (1, 1), f"Expected predicted shape (1, 1), got {y_predicted.shape}"
         np.testing.assert_allclose(w, expected_w, atol=1e-10)
         np.testing.assert_allclose(y_predicted, [[7]], atol=1e-10)
 
@@ -46,6 +49,9 @@ class SolverComputationTests(unittest.TestCase):
         with quiet_stdout():
             poly, _, w, _, _ = fit_polynomial_regression(X, y, order=2)
             y_predicted = predict_polynomial_regression(poly, w, np.array([[3]], dtype=float))
+        assert w.shape == (3, 1), f"Expected weight shape (3, 1), got {w.shape}"
+        assert y_predicted is not None, "y_predicted should not be None"
+        assert y_predicted.shape == (1, 1), f"Expected predicted shape (1, 1), got {y_predicted.shape}"
         np.testing.assert_allclose(w.reshape(-1), [1, 2, 1], atol=1e-10)
         np.testing.assert_allclose(y_predicted, [[16]], atol=1e-10)
 
@@ -58,6 +64,9 @@ class SolverComputationTests(unittest.TestCase):
         with quiet_stdout():
             _, _, w, _, _ = fit_ridge_regression(X, y, LAMBDA=ridge_lambda, form="primal form")
             y_predicted = predict_ridge_regression(w, np.array([[1, 3]], dtype=float))
+        assert w.shape == (2, 1), f"Expected weight shape (2, 1), got {w.shape}"
+        assert y_predicted is not None, "y_predicted should not be None"
+        assert y_predicted.shape == (1, 1), f"Expected predicted shape (1, 1), got {y_predicted.shape}"
         np.testing.assert_allclose(w, expected_w, atol=1e-10)
         np.testing.assert_allclose(y_predicted, np.array([[1, 3]], dtype=float) @ expected_w, atol=1e-10)
 
@@ -77,6 +86,7 @@ class SolverComputationTests(unittest.TestCase):
         with quiet_stdout():
             _, w, _, labels, _, _ = fit_onehot_linearclassification(X, y)
             y_predicted = predict_onehot_linearclassification(w, np.array([[1, 2.5]], dtype=float), labels)
+        assert labels is not None, "Labels should not be None"
         self.assertEqual(labels, ["low", "high"])
         self.assertEqual(labels[int(np.argmax(y_predicted[0]))], "high")
 

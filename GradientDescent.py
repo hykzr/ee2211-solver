@@ -9,7 +9,7 @@ def infer_variables(cost_expression):
     return [str(symbol) for symbol in sorted(expression.free_symbols, key=lambda item: item.name)]
 
 
-def gradient_descent(cost_expression, variables=None, initial_values=None, learning_rate=0.1, iterations=1, tolerance=None):
+def gradient_descent(cost_expression, variables=None, initial_values=None, learning_rate=0.1, iterations=10, tolerance=None):
     expression = sp.sympify(cost_expression.replace("^", "**"))
     if variables is None:
         variables = infer_variables(cost_expression)
@@ -80,4 +80,8 @@ def print_gradient_descent_result(expression, variables, gradient_expressions, h
 
 def _evaluate_expression(expression, symbols, values):
     substitutions = {symbol: value for symbol, value in zip(symbols, values)}
-    return float(expression.evalf(subs=substitutions))
+    result=expression.evalf(subs=substitutions)
+    try:
+        return float(result)    
+    except (TypeError, ValueError):
+        raise ValueError(f"Failed to convert expression {result} to float")

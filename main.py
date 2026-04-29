@@ -305,6 +305,45 @@ def prompt_optional_float(prompt):
 		return prompt_optional_float(prompt)
 
 
+def prompt_gradient_cost_expression():
+	while True:
+		cost_expression = input("Cost function C(...): ").strip()
+		if not cost_expression:
+			print("Cost function is required.")
+			continue
+		try:
+			variables = infer_variables(cost_expression)
+		except Exception as exc:
+			print(f"Input error: {exc}")
+			continue
+		if not variables:
+			print("Cost function must contain at least one variable.")
+			continue
+		return cost_expression, variables
+
+
+def prompt_gradient_initial_values(variables):
+	variable_text = ", ".join(variables)
+	while True:
+		raw = input(f"Initial values for {variable_text} (comma-separated): ").strip().replace("−", "-")
+		if not raw:
+			print("Initial values are required.")
+			continue
+
+		parts = [part.strip() for part in raw.split(",")]
+		if any(not part for part in parts):
+			print("Please enter one numeric value per variable, separated by commas.")
+			continue
+		if len(parts) != len(variables):
+			print(f"Expected {len(variables)} initial values for {variable_text}, got {len(parts)}.")
+			continue
+
+		try:
+			return np.asarray([float(part) for part in parts], dtype=float)
+		except ValueError:
+			print("Please enter numeric initial values separated by commas.")
+
+
 def inspect_array():
 	array = input_array("array")
 	cache_result(array)
@@ -440,20 +479,12 @@ def run_pearson_correlation():
 def run_gradient_descent():
 	print_section("Gradient Descent")
 	print("Use Python/SymPy syntax, e.g. x**2 + x*y**2 or sin(w)**2.")
-	cost_expression = input("Cost function C(...): ").strip()
-	if not cost_expression:
-		raise ValueError("Cost function is required.")
+	cost_expression, variables = prompt_gradient_cost_expression()
+	print(f"Variables: {', '.join(variables)}")
 
-	inferred_variables = infer_variables(cost_expression)
-	default_variables = ",".join(inferred_variables)
-	variable_text = input(f"Variables in update order [{default_variables}]: ").strip()
-	variables = [item.strip() for item in variable_text.split(",") if item.strip()] if variable_text else inferred_variables
-	if not variables:
-		raise ValueError("Could not infer variables. Please enter them manually.")
-
-	initial_values = input_array("initial values, one per variable").reshape(-1)
+	initial_values = prompt_gradient_initial_values(variables)
 	learning_rate = prompt_float("Learning rate", default=0.1)
-	iterations = prompt_int("Number of iterations", default=1, minimum=1)
+	iterations = prompt_int("Number of iterations", default=10, minimum=1)
 	tolerance = prompt_optional_float("Tolerance")
 	expression, gradient_expressions, history = gradient_descent(
 		cost_expression,
