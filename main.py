@@ -4,7 +4,14 @@ from traceback import print_exc
 
 import numpy as np
 
-from CommonUtils import add_bias_column, ensure_2d, pretty_print_array, validate_same_feature_count, validate_same_sample_count
+from CommonUtils import (
+	add_bias_column,
+	ensure_2d,
+	format_number,
+	pretty_print_array,
+	validate_same_feature_count,
+	validate_same_sample_count,
+)
 from DecisionTreeUtils import (
 	print_classification_impurity_summary,
 	print_regression_split_candidates,
@@ -30,22 +37,23 @@ from pearson_correlation import pearson_correlation
 MENU_TEXT = """EE2211 Solver
 | 0. Exit                                                |
 | 1. Parse and inspect array                             |
-| 2. Linear regression                                   |
-| 3. Polynomial regression                               |
-| 4. Ridge regression                                    |
-| 5. Ridge polynomial regression                         |
-| 6. One-hot linear classification                       |
-| 7. One-hot polynomial classification                   |
-| 8. Pearson correlation                                 |
-| 9. Show cached input/result                            |
-| 10. Gradient descent                                   |
-| 11. Classification tree impurity                       |
-| 12. Regression tree MSE/split                          |
+| 2. Solve directly Xw = y                               |
+| 3. Linear regression                                   |
+| 4. Polynomial regression                               |
+| 5. Ridge regression                                    |
+| 6. Ridge polynomial regression                         |
+| 7. One-hot linear classification                       |
+| 8. One-hot polynomial classification                   |
+| 9. Pearson correlation                                 |
+| 10. Show cached input/result                           |
+| 11. Gradient descent                                   |
+| 12. Classification tree impurity                       |
+| 13. Regression tree MSE/split                          |
 +--------------------------------------------------------+"""
 
 INPUT_HELP = (
-	"Input format: one row per line using commas or spaces, finish with an empty line.\n"
-	"You may also paste Python-style arrays such as [[1, 2], [3, 4]].\n"
+	"Input format: exactly one line. Separate rows with ';', e.g. 1 2; 3 4.\n"
+	"You may also paste one-line Python-style arrays such as [[1, 2], [3, 4]].\n"
 	"Shortcuts: '-' uses the last input array, '_' uses the last result array."
 )
 
@@ -65,6 +73,8 @@ def parse_numeric_array(raw_text):
 	text = raw_text.strip()
 	if not text:
 		raise ValueError("Input is empty.")
+	if "\n" in text or "\r" in text:
+		raise ValueError("New lines are not supported. Separate rows with ';' or use a one-line Python array.")
 
 	if text.startswith("[") or text.startswith("("):
 		parsed = ast.literal_eval(text)
@@ -92,13 +102,15 @@ def parse_numeric_array(raw_text):
 
 
 def parse_mixed_array(raw_text):
+	text = raw_text.strip()
+	if not text:
+		raise ValueError("Input is empty.")
+	if "\n" in text or "\r" in text:
+		raise ValueError("New lines are not supported. Separate rows with ';' or use a one-line Python array.")
+
 	try:
 		return parse_numeric_array(raw_text)
 	except (SyntaxError, ValueError):
-		text = raw_text.strip()
-		if not text:
-			raise ValueError("Input is empty.")
-
 		if text.startswith("[") or text.startswith("("):
 			parsed = ast.literal_eval(text)
 			arr = np.asarray(parsed, dtype=object)
@@ -145,7 +157,7 @@ def cache_result(array):
 	return LAST_RESULT
 
 
-def input_array(name, allow_last_result=True):
+def _legacy_input_array(name, allow_last_result=True):
 	print_section(f"Input {name}")
 	if VERBOSE:
 		print(INPUT_HELP)
@@ -180,7 +192,7 @@ def input_array(name, allow_last_result=True):
 		return input_array(name, allow_last_result=allow_last_result)
 
 
-def input_optional_array(name, allow_last_result=True):
+def _legacy_input_optional_array(name, allow_last_result=True):
 	print_section(f"Input {name}")
 	if VERBOSE:
 		print(INPUT_HELP)
@@ -215,7 +227,7 @@ def input_optional_array(name, allow_last_result=True):
 		return input_optional_array(name, allow_last_result=allow_last_result)
 
 
-def input_target_array(name):
+def _legacy_input_target_array(name):
 	print_section(f"Input {name}")
 	if VERBOSE:
 		print(INPUT_HELP)
@@ -344,10 +356,157 @@ def prompt_gradient_initial_values(variables):
 			print("Please enter numeric initial values separated by commas.")
 
 
+def input_array(name, allow_last_result=True):
+	print_section(f"Input {name}")
+	if VERBOSE:
+		print(INPUT_HELP)
+	line = input("> ").strip().replace("âˆ’", "-")
+	if not line:
+		print("Enter one line of input.")
+		return input_array(name, allow_last_result=allow_last_result)
+
+	if line == "-":
+		if LAST_INPUT is None:
+			print("No cached input is available.")
+			return input_array(name, allow_last_result=allow_last_result)
+		return cache_input(LAST_INPUT)
+
+	if line == "_" and allow_last_result:
+		if LAST_RESULT is None:
+			print("No cached result is available.")
+			return input_array(name, allow_last_result=allow_last_result)
+		return cache_input(LAST_RESULT)
+
+	try:
+		return cache_input(parse_numeric_array(line))
+	except (SyntaxError, ValueError) as exc:
+		print(f"Input error: {exc}")
+		return input_array(name, allow_last_result=allow_last_result)
+
+
+def input_optional_array(name, allow_last_result=True):
+	print_section(f"Input {name}")
+	if VERBOSE:
+		print(INPUT_HELP)
+	print("Leave this input empty to skip it and return to the main menu after fitting.")
+	line = input("> ").strip().replace("âˆ’", "-")
+	if not line:
+		return None
+
+	if line == "-":
+		if LAST_INPUT is None:
+			print("No cached input is available.")
+			return input_optional_array(name, allow_last_result=allow_last_result)
+		return cache_input(LAST_INPUT)
+
+	if line == "_" and allow_last_result:
+		if LAST_RESULT is None:
+			print("No cached result is available.")
+			return input_optional_array(name, allow_last_result=allow_last_result)
+		return cache_input(LAST_RESULT)
+
+	try:
+		return cache_input(parse_numeric_array(line))
+	except (SyntaxError, ValueError) as exc:
+		print(f"Input error: {exc}")
+		return input_optional_array(name, allow_last_result=allow_last_result)
+
+
+def input_target_array(name):
+	print_section(f"Input {name}")
+	if VERBOSE:
+		print(INPUT_HELP)
+	print("For classification targets, you may enter one-hot rows or labels such as class1;class2;class3.")
+	line = input("> ").strip().replace("âˆ’", "-")
+	if not line:
+		print("Enter one line of input.")
+		return input_target_array(name)
+
+	try:
+		return parse_mixed_array(line)
+	except (SyntaxError, ValueError) as exc:
+		print(f"Input error: {exc}")
+		return input_target_array(name)
+
+
+def system_shape_description(matrix):
+	rows, cols = matrix.shape
+	if rows > cols:
+		return "overdetermined"
+	if rows < cols:
+		return "underdetermined"
+	return "evendetermined"
+
+
+def inspect_array_details(array):
+	rows, cols = array.shape
+	rank = np.linalg.matrix_rank(array)
+	print(f"shape: {rows} x {cols}")
+	print(f"rank: {rank}")
+
+	is_square = rows == cols
+	if is_square:
+		determinant = np.linalg.det(array)
+		print("determinant exists: yes")
+		print(f"determinant: {format_number(determinant)}")
+	else:
+		print("determinant exists: no")
+
+	inverse_exists = is_square and rank == rows
+	left_inverse_exists = rank == cols
+	right_inverse_exists = rank == rows
+	print(f"inverse exists: {'yes' if inverse_exists else 'no'}")
+	print(f"left inverse exists: {'yes' if left_inverse_exists else 'no'}")
+	print(f"right inverse exists: {'yes' if right_inverse_exists else 'no'}")
+
+	if inverse_exists:
+		pretty_print_array("inverse", np.linalg.inv(array), show_python=False)
+	if left_inverse_exists:
+		left_inverse = np.linalg.inv(array.T @ array) @ array.T
+		pretty_print_array("left_inverse", left_inverse, show_python=False)
+	if right_inverse_exists:
+		right_inverse = array.T @ np.linalg.inv(array @ array.T)
+		pretty_print_array("right_inverse", right_inverse, show_python=False)
+
+
 def inspect_array():
 	array = input_array("array")
 	cache_result(array)
 	print_array("array", array)
+	inspect_array_details(array)
+
+
+def run_direct_solve():
+	X = input_array("X")
+	y = input_array("y")
+	validate_same_sample_count(X, y)
+
+	rows, variables = X.shape
+	system_shape = system_shape_description(X)
+	rank_x = np.linalg.matrix_rank(X)
+	rank_augmented = np.linalg.matrix_rank(np.hstack((X, y)))
+	is_consistent = rank_x == rank_augmented
+
+	print_section("Solve Xw = y")
+	print(f"system: {system_shape} ({rows} equations, {variables} unknowns)")
+	print(f"rank(X): {rank_x}")
+	print(f"rank([X y]): {rank_augmented}")
+
+	if is_consistent:
+		w, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
+		if rank_x == variables:
+			print("solution: unique exact solution")
+		else:
+			print("solution: infinitely many exact solutions; showing one minimum-norm solution")
+		pretty_print_array("w", w, show_python=False)
+		cache_result(w)
+		return
+
+	print("solution: no exact solution")
+	w_hat, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
+	pretty_print_array("w_hat", w_hat, show_python=False)
+	pretty_print_array("residual", X @ w_hat - y, show_python=False)
+	cache_result(w_hat)
 
 
 def run_linear_regression():
@@ -546,37 +705,41 @@ def process_input():
 	actions = {
 		"1": inspect_array,
 		"inspect": inspect_array,
-		"2": run_linear_regression,
+		"2": run_direct_solve,
+		"solve": run_direct_solve,
+		"direct": run_direct_solve,
+		"xw=y": run_direct_solve,
+		"3": run_linear_regression,
 		"linear": run_linear_regression,
 		"lin": run_linear_regression,
-		"3": run_polynomial_regression,
+		"4": run_polynomial_regression,
 		"poly": run_polynomial_regression,
 		"polynomial": run_polynomial_regression,
-		"4": run_ridge_regression,
+		"5": run_ridge_regression,
 		"ridge": run_ridge_regression,
-		"5": run_ridge_polynomial_regression,
+		"6": run_ridge_polynomial_regression,
 		"ridgepoly": run_ridge_polynomial_regression,
 		"ridge-polynomial": run_ridge_polynomial_regression,
-		"6": run_onehot_linearclassification,
+		"7": run_onehot_linearclassification,
 		"onehot": run_onehot_linearclassification,
 		"classification": run_onehot_linearclassification,
-		"7": run_onehot_polynomial_classification,
+		"8": run_onehot_polynomial_classification,
 		"onehotpoly": run_onehot_polynomial_classification,
 		"polyclass": run_onehot_polynomial_classification,
-		"8": run_pearson_correlation,
+		"9": run_pearson_correlation,
 		"pearson": run_pearson_correlation,
 		"corr": run_pearson_correlation,
-		"9": show_cache,
+		"10": show_cache,
 		"cache": show_cache,
-		"10": run_gradient_descent,
+		"11": run_gradient_descent,
 		"gd": run_gradient_descent,
 		"gradient": run_gradient_descent,
 		"gradient descent": run_gradient_descent,
-		"11": run_classification_tree_impurity,
+		"12": run_classification_tree_impurity,
 		"gini": run_classification_tree_impurity,
 		"entropy": run_classification_tree_impurity,
 		"impurity": run_classification_tree_impurity,
-		"12": run_regression_tree_mse,
+		"13": run_regression_tree_mse,
 		"tree mse": run_regression_tree_mse,
 		"regression tree": run_regression_tree_mse,
 		"split": run_regression_tree_mse,
@@ -589,9 +752,17 @@ def process_input():
 	if action is None:
 		print("Unknown option.")
 	else:
-		action()
+		try:
+			action()
+		except KeyboardInterrupt:
+			print("\nReturning to main menu.")
+			clear()
+			return True
 
-	input("\nPress Enter to continue...")
+	try:
+		input("\nPress Enter to continue...")
+	except KeyboardInterrupt:
+		print("\nReturning to main menu.")
 	clear()
 	return True
 
