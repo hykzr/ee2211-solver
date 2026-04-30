@@ -19,7 +19,6 @@ def fit_ridge_poly_regression(X, y, LAMBDA, order, form):
 
     P_train_predicted = P @ w
     print_value("y_train_predicted", P_train_predicted)
-    print_value("y_train_classified", np.sign(P_train_predicted))
     sum_of_square, mean_squared_error = print_error_summary(y, P_train_predicted)
 
     return poly, system, resolved_form, w, sum_of_square, mean_squared_error

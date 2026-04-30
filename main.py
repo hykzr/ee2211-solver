@@ -453,6 +453,10 @@ def print_solve_result(title, coefficient_matrix, target_matrix, result_name, or
 
 	solution, _, _, _ = np.linalg.lstsq(coefficient_matrix, target_matrix, rcond=None)
 	display_solution = orient_result(solution)
+	predicted_target = coefficient_matrix @ solution
+	residual = predicted_target - target_matrix
+	mean_squared_error = np.mean(np.square(residual), axis=0, keepdims=True)
+	standard_error = np.sqrt(mean_squared_error)
 
 	if is_consistent:
 		if rank_coefficients == variables:
@@ -460,13 +464,16 @@ def print_solve_result(title, coefficient_matrix, target_matrix, result_name, or
 		else:
 			print("solution: infinitely many exact solutions; showing one minimum-norm solution")
 		pretty_print_array(result_name, display_solution, show_python=False)
+		pretty_print_array("standard error", orient_result(standard_error), show_python=False)
+		pretty_print_array("mse", orient_result(mean_squared_error), show_python=False)
 		cache_result(display_solution)
 		return
 
 	print("solution: no exact solution")
 	pretty_print_array(f"{result_name}_hat", display_solution, show_python=False)
-	residual = coefficient_matrix @ solution - target_matrix
 	pretty_print_array("residual", orient_result(residual), show_python=False)
+	pretty_print_array("standard error", orient_result(standard_error), show_python=False)
+	pretty_print_array("mse", orient_result(mean_squared_error), show_python=False)
 	cache_result(display_solution)
 
 
@@ -531,7 +538,8 @@ def run_linear_regression():
 	Y = input_array("Y")
 	validate_same_sample_count(X, Y)
 
-	X_model = add_bias_column(X)
+	include_bias = prompt_yes_no("Add bias/offset term", default=True)
+	X_model = add_bias_column(X) if include_bias else X
 
 	_, w, _, _, _ = linear_regression(X_model, Y)
 	cache_result(w)
@@ -540,7 +548,7 @@ def run_linear_regression():
 	if X_test is None:
 		return
 	validate_same_feature_count(X, X_test)
-	X_test_model = add_bias_column(X_test)
+	X_test_model = add_bias_column(X_test) if include_bias else X_test
 	y_predicted = X_test_model @ w
 	pretty_print_array("y_predicted", y_predicted, show_python=False, show_rank=False)
 	pretty_print_array("y_predicted_classified", np.sign(y_predicted), show_python=False, show_rank=False)

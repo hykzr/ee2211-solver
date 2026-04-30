@@ -11,9 +11,7 @@ def fit_linear_regression(X, y):
 
     y_calculated = X @ w
     sum_of_square, mean_squared_error = print_error_summary(y, y_calculated)
-
-    y_predicted_train = X @ w
-    print_value("y_train_classified", np.sign(y_predicted_train))
+    print_value("predicted y", y_calculated)
 
     return system, w, sum_of_square, mean_squared_error
 
