@@ -19,7 +19,6 @@ def fit_linear_regression(X, y):
 def predict_linear_regression(w, X_test):
     y_predicted = X_test @ w
     print_value("y_predicted", y_predicted)
-    print_value("y_predicted_classified", np.sign(y_predicted))
     print("")
     return y_predicted
 

@@ -4,7 +4,13 @@ import unittest
 
 import numpy as np
 
-from CommonUtils import add_bias_column, calculate_closed_form_weights, calculate_ridge_weights
+from CommonUtils import (
+    add_bias_column,
+    calculate_closed_form_weights,
+    calculate_ridge_weights,
+    pretty_print_array,
+    print_error_summary,
+)
 from DecisionTreeUtils import classification_impurity_summary, find_best_regression_split, regression_threshold_summary
 from GradientDescent import gradient_descent
 from LinearRegression import linear_regression
@@ -27,6 +33,18 @@ def quiet_stdout():
 
 
 class SolverComputationTests(unittest.TestCase):
+    def test_single_value_arrays_print_inline(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            print_error_summary(np.array([[1]], dtype=float), np.array([[1]], dtype=float))
+            pretty_print_array("mse", np.array([[0]], dtype=float), show_python=False)
+
+        output = stdout.getvalue()
+        self.assertIn("square error: 0", output)
+        self.assertIn("MEAN square error: 0", output)
+        self.assertIn("mse: 0", output)
+        self.assertNotIn("[0]", output)
+
     def test_closed_form_and_linear_regression(self):
         X = np.array([[1, 0], [1, 1], [1, 2]], dtype=float)
         y = np.array([[1], [3], [5]], dtype=float)

@@ -56,8 +56,20 @@ def python_array_literal(array):
     return "[" + ", ".join(rows) + "]"
 
 
+def _is_scalar_like(array):
+    return np.asarray(array).size == 1
+
+
+def _format_scalar_like(array):
+    return format_number(np.asarray(array).reshape(-1)[0])
+
+
 def pretty_print_array(name, array, show_python=True, show_rank=False):
     arr = ensure_2d(array)
+    if _is_scalar_like(arr):
+        print(f"{name}: {_format_scalar_like(arr)}")
+        return
+
     print(f"{name}:")
     if show_rank:
         print(f"rank: {np.linalg.matrix_rank(arr)}")
@@ -68,8 +80,8 @@ def pretty_print_array(name, array, show_python=True, show_rank=False):
 
 def print_value(name, value, show_python=False, show_rank=False):
     arr = np.asarray(value)
-    if arr.ndim == 0:
-        print(f"{name}: {format_number(arr.item())}")
+    if _is_scalar_like(arr):
+        print(f"{name}: {_format_scalar_like(arr)}")
         return
     pretty_print_array(name, arr, show_python=show_python, show_rank=show_rank)
 

@@ -551,7 +551,6 @@ def run_linear_regression():
 	X_test_model = add_bias_column(X_test) if include_bias else X_test
 	y_predicted = X_test_model @ w
 	pretty_print_array("y_predicted", y_predicted, show_python=False, show_rank=False)
-	pretty_print_array("y_predicted_classified", np.sign(y_predicted), show_python=False, show_rank=False)
 	cache_result(y_predicted)
 
 
