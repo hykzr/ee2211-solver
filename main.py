@@ -37,18 +37,19 @@ from pearson_correlation import pearson_correlation
 MENU_TEXT = """EE2211 Solver
 | 0. Exit                                                |
 | 1. Parse and inspect array                             |
-| 2. Solve directly Xw = y                               |
-| 3. Linear regression                                   |
-| 4. Polynomial regression                               |
-| 5. Ridge regression                                    |
-| 6. Ridge polynomial regression                         |
-| 7. One-hot linear classification                       |
-| 8. One-hot polynomial classification                   |
-| 9. Pearson correlation                                 |
-| 10. Show cached input/result                           |
-| 11. Gradient descent                                   |
-| 12. Classification tree impurity                       |
-| 13. Regression tree MSE/split                          |
+| 2. Solve Xw = y                                        |
+| 3. Solve wX = y                                        |
+| 4. Linear regression                                   |
+| 5. Polynomial regression                               |
+| 6. Ridge regression                                    |
+| 7. Ridge polynomial regression                         |
+| 8. One-hot linear classification                       |
+| 9. One-hot polynomial classification                   |
+| 10. Pearson correlation                                |
+| 11. Show cached input/result                           |
+| 12. Gradient descent                                   |
+| 13. Classification tree impurity                       |
+| 14. Regression tree MSE/split                          |
 +--------------------------------------------------------+"""
 
 INPUT_HELP = (
@@ -438,6 +439,37 @@ def system_shape_description(matrix):
 	return "evendetermined"
 
 
+def print_solve_result(title, coefficient_matrix, target_matrix, result_name, orient_result=lambda value: value):
+	rows, variables = coefficient_matrix.shape
+	system_shape = system_shape_description(coefficient_matrix)
+	rank_coefficients = np.linalg.matrix_rank(coefficient_matrix)
+	rank_augmented = np.linalg.matrix_rank(np.hstack((coefficient_matrix, target_matrix)))
+	is_consistent = rank_coefficients == rank_augmented
+
+	print_section(title)
+	print(f"system: {system_shape} ({rows} equations, {variables} unknowns)")
+	print(f"rank(coefficients): {rank_coefficients}")
+	print(f"rank(augmented): {rank_augmented}")
+
+	solution, _, _, _ = np.linalg.lstsq(coefficient_matrix, target_matrix, rcond=None)
+	display_solution = orient_result(solution)
+
+	if is_consistent:
+		if rank_coefficients == variables:
+			print("solution: unique exact solution")
+		else:
+			print("solution: infinitely many exact solutions; showing one minimum-norm solution")
+		pretty_print_array(result_name, display_solution, show_python=False)
+		cache_result(display_solution)
+		return
+
+	print("solution: no exact solution")
+	pretty_print_array(f"{result_name}_hat", display_solution, show_python=False)
+	residual = coefficient_matrix @ solution - target_matrix
+	pretty_print_array("residual", orient_result(residual), show_python=False)
+	cache_result(display_solution)
+
+
 def inspect_array_details(array):
 	rows, cols = array.shape
 	rank = np.linalg.matrix_rank(array)
@@ -476,37 +508,22 @@ def inspect_array():
 	inspect_array_details(array)
 
 
-def run_direct_solve():
+def run_solve():
 	X = input_array("X")
 	y = input_array("y")
 	validate_same_sample_count(X, y)
+	print_solve_result("Solve Xw = y", X, y, "w")
 
-	rows, variables = X.shape
-	system_shape = system_shape_description(X)
-	rank_x = np.linalg.matrix_rank(X)
-	rank_augmented = np.linalg.matrix_rank(np.hstack((X, y)))
-	is_consistent = rank_x == rank_augmented
 
-	print_section("Solve Xw = y")
-	print(f"system: {system_shape} ({rows} equations, {variables} unknowns)")
-	print(f"rank(X): {rank_x}")
-	print(f"rank([X y]): {rank_augmented}")
+def run_left_solve():
+	X = input_array("X")
+	y = input_array("y")
+	if X.shape[1] != y.shape[1]:
+		raise ValueError(
+			f"Column count mismatch: X has {X.shape[1]} columns but y has {y.shape[1]} columns."
+		)
 
-	if is_consistent:
-		w, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
-		if rank_x == variables:
-			print("solution: unique exact solution")
-		else:
-			print("solution: infinitely many exact solutions; showing one minimum-norm solution")
-		pretty_print_array("w", w, show_python=False)
-		cache_result(w)
-		return
-
-	print("solution: no exact solution")
-	w_hat, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
-	pretty_print_array("w_hat", w_hat, show_python=False)
-	pretty_print_array("residual", X @ w_hat - y, show_python=False)
-	cache_result(w_hat)
+	print_solve_result("Solve wX = y", X.T, y.T, "w", orient_result=lambda value: value.T)
 
 
 def run_linear_regression():
@@ -705,41 +722,44 @@ def process_input():
 	actions = {
 		"1": inspect_array,
 		"inspect": inspect_array,
-		"2": run_direct_solve,
-		"solve": run_direct_solve,
-		"direct": run_direct_solve,
-		"xw=y": run_direct_solve,
-		"3": run_linear_regression,
+		"2": run_solve,
+		"solve": run_solve,
+		"xw=y": run_solve,
+		"3": run_left_solve,
+		"left solve": run_left_solve,
+		"wx=y": run_left_solve,
+		"wX=y": run_left_solve,
+		"4": run_linear_regression,
 		"linear": run_linear_regression,
 		"lin": run_linear_regression,
-		"4": run_polynomial_regression,
+		"5": run_polynomial_regression,
 		"poly": run_polynomial_regression,
 		"polynomial": run_polynomial_regression,
-		"5": run_ridge_regression,
+		"6": run_ridge_regression,
 		"ridge": run_ridge_regression,
-		"6": run_ridge_polynomial_regression,
+		"7": run_ridge_polynomial_regression,
 		"ridgepoly": run_ridge_polynomial_regression,
 		"ridge-polynomial": run_ridge_polynomial_regression,
-		"7": run_onehot_linearclassification,
+		"8": run_onehot_linearclassification,
 		"onehot": run_onehot_linearclassification,
 		"classification": run_onehot_linearclassification,
-		"8": run_onehot_polynomial_classification,
+		"9": run_onehot_polynomial_classification,
 		"onehotpoly": run_onehot_polynomial_classification,
 		"polyclass": run_onehot_polynomial_classification,
-		"9": run_pearson_correlation,
+		"10": run_pearson_correlation,
 		"pearson": run_pearson_correlation,
 		"corr": run_pearson_correlation,
-		"10": show_cache,
+		"11": show_cache,
 		"cache": show_cache,
-		"11": run_gradient_descent,
+		"12": run_gradient_descent,
 		"gd": run_gradient_descent,
 		"gradient": run_gradient_descent,
 		"gradient descent": run_gradient_descent,
-		"12": run_classification_tree_impurity,
+		"13": run_classification_tree_impurity,
 		"gini": run_classification_tree_impurity,
 		"entropy": run_classification_tree_impurity,
 		"impurity": run_classification_tree_impurity,
-		"13": run_regression_tree_mse,
+		"14": run_regression_tree_mse,
 		"tree mse": run_regression_tree_mse,
 		"regression tree": run_regression_tree_mse,
 		"split": run_regression_tree_mse,
