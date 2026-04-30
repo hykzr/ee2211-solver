@@ -4,6 +4,7 @@ import io
 import json
 import time
 import uuid
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -39,6 +40,40 @@ MATRIX_HELP = (
     "`1 2; 3 4`, `1, 2\\n3, 4`, or `[[1, 2], [3, 4]]`."
 )
 RIDGE_FORMS = ("auto", "primal form", "dual form")
+STATE_FILE = Path(__file__).resolve().parent / "temp" / "webui_state.json"
+STATE_VERSION = 1
+PERSISTED_WIDGET_KEYS = (
+    "array_inspect_raw",
+    "solve_equation",
+    "solve_x_raw",
+    "solve_y_raw",
+    "reg_model_type",
+    "reg_target_mode",
+    "reg_regularization",
+    "reg_predict_test",
+    "reg_order",
+    "reg_include_bias",
+    "reg_ridge_lambda",
+    "reg_ridge_form",
+    "reg_x_raw",
+    "reg_y_raw",
+    "reg_x_test_raw",
+    "reg_y_test_raw",
+    "pearson_x_raw",
+    "pearson_y_raw",
+    "gradient_cost_expression",
+    "gradient_initial_values",
+    "gradient_learning_rate",
+    "gradient_iterations",
+    "gradient_tolerance",
+    "tree_mode",
+    "tree_counts_raw",
+    "tree_measure",
+    "tree_x_raw",
+    "tree_y_raw",
+    "tree_threshold",
+    "tree_find_best",
+)
 
 
 def main():
@@ -155,8 +190,95 @@ def configure_page():
 
 
 def ensure_state():
+    if "_solver_state_loaded" not in st.session_state:
+        load_persisted_state()
+        st.session_state._solver_state_loaded = True
     if "matrix_cache" not in st.session_state:
         st.session_state.matrix_cache = []
+
+
+def load_persisted_state():
+    try:
+        payload = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(payload, dict):
+        return
+
+    widgets = payload.get("widgets", {})
+    if isinstance(widgets, dict):
+        for key in PERSISTED_WIDGET_KEYS:
+            if key in widgets:
+                st.session_state[key] = widgets[key]
+
+    cache = payload.get("matrix_cache", [])
+    if isinstance(cache, list):
+        st.session_state.matrix_cache = [entry for entry in (deserialize_cache_entry(item) for item in cache) if entry]
+
+
+def save_persisted_state():
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version": STATE_VERSION,
+            "saved_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "widgets": persisted_widget_values(),
+            "matrix_cache": [
+                serialize_cache_entry(entry)
+                for entry in st.session_state.get("matrix_cache", [])
+            ],
+        }
+        temp_file = STATE_FILE.with_suffix(".tmp")
+        temp_file.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        temp_file.replace(STATE_FILE)
+    except OSError:
+        pass
+
+
+def persisted_widget_values():
+    return {key: json_safe_value(st.session_state[key]) for key in PERSISTED_WIDGET_KEYS if key in st.session_state}
+
+
+def serialize_cache_entry(entry):
+    value = as_2d_any(entry.get("value", []))
+    return {
+        "id": str(entry.get("id", uuid.uuid4().hex)),
+        "name": str(entry.get("name", "")),
+        "source": str(entry.get("source", "")),
+        "kind": str(entry.get("kind", "")),
+        "shape": str(entry.get("shape", shape_text(value))),
+        "value": json_safe_value(value),
+        "text": str(entry.get("text", matrix_plain_text(value))),
+        "created_at": str(entry.get("created_at", "")),
+    }
+
+
+def deserialize_cache_entry(entry):
+    if not isinstance(entry, dict):
+        return None
+    value = as_2d_any(entry.get("value", []))
+    return {
+        "id": str(entry.get("id") or uuid.uuid4().hex),
+        "name": str(entry.get("name", "")),
+        "source": str(entry.get("source", "")),
+        "kind": str(entry.get("kind", "")),
+        "shape": str(entry.get("shape") or shape_text(value)),
+        "value": value,
+        "text": str(entry.get("text") or matrix_plain_text(value)),
+        "created_at": str(entry.get("created_at", "")),
+    }
+
+
+def json_safe_value(value):
+    if isinstance(value, np.ndarray):
+        return [[json_safe_value(cell) for cell in row] for row in as_2d_any(value).tolist()]
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, (list, tuple)):
+        return [json_safe_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): json_safe_value(item) for key, item in value.items()}
+    return value
 
 
 def render_array_tab():
@@ -165,6 +287,8 @@ def render_array_tab():
         array, _ = matrix_input("Array", "array_inspect", default="1 2; 3 4")
         submitted = st.form_submit_button("Inspect")
 
+    if submitted:
+        save_persisted_state()
     if not submitted:
         return
     if array is None:
@@ -186,7 +310,7 @@ def render_array_tab():
 def render_solve_tab():
     st.subheader("Solve Linear System")
     with st.form("solve_form", border=True):
-        equation = st.selectbox("Equation", ("Xw = y", "wX = y"))
+        equation = st.selectbox("Equation", ("Xw = y", "wX = y"), key="solve_equation")
         col_x, col_y = st.columns(2)
         with col_x:
             X, _ = matrix_input("X", "solve_x", default="1 1\n1 2\n1 3")
@@ -194,6 +318,8 @@ def render_solve_tab():
             y, _ = matrix_input("y", "solve_y", default="2\n3\n4")
         submitted = st.form_submit_button("Solve")
 
+    if submitted:
+        save_persisted_state()
     if not submitted:
         return
     if X is None or y is None:
@@ -288,6 +414,8 @@ def render_regression_tab():
 
         submitted = st.form_submit_button("Fit")
 
+    if submitted:
+        save_persisted_state()
     if not submitted:
         return
     if X is None or Y is None:
@@ -384,6 +512,8 @@ def render_pearson_tab():
             Y, _ = matrix_input("Y", "pearson_y", default="2 1\n4 1\n6 2\n8 2")
         submitted = st.form_submit_button("Calculate")
 
+    if submitted:
+        save_persisted_state()
     if not submitted:
         return
     if X is None or Y is None:
@@ -418,19 +548,25 @@ def render_pearson_tab():
 def render_gradient_tab():
     st.subheader("Gradient Descent")
     with st.form("gradient_form", border=True):
-        cost_expression = st.text_input("Cost function C(...)", value="x**2 + x*y**2")
+        cost_expression = st.text_input(
+            "Cost function C(...)",
+            value="x**2 + x*y**2",
+            key="gradient_cost_expression",
+        )
         inferred = infer_expression_variables(cost_expression)
         st.markdown(f'<div class="solver-meta">Variable order: {", ".join(inferred) or "none"}</div>', unsafe_allow_html=True)
-        values_text = st.text_input("Initial values", value="3, 2")
+        values_text = st.text_input("Initial values", value="3, 2", key="gradient_initial_values")
         controls = st.columns(3)
         with controls[0]:
-            learning_rate = st.number_input("Learning rate", min_value=0.0, value=0.2, step=0.05)
+            learning_rate = st.number_input("Learning rate", min_value=0.0, value=0.2, step=0.05, key="gradient_learning_rate")
         with controls[1]:
-            iterations = st.number_input("Iterations", min_value=1, max_value=10000, value=10, step=1)
+            iterations = st.number_input("Iterations", min_value=1, max_value=10000, value=10, step=1, key="gradient_iterations")
         with controls[2]:
-            tolerance_text = st.text_input("Tolerance", value="")
+            tolerance_text = st.text_input("Tolerance", value="", key="gradient_tolerance")
         submitted = st.form_submit_button("Run")
 
+    if submitted:
+        save_persisted_state()
     if not submitted:
         return
     if not cost_expression.strip():
@@ -469,7 +605,7 @@ def render_gradient_tab():
 
 def render_decision_tree_tab():
     st.subheader("Decision Tree")
-    mode = st.selectbox("Mode", ("Classification impurity", "Regression MSE / split"))
+    mode = st.selectbox("Mode", ("Classification impurity", "Regression MSE / split"), key="tree_mode")
     if mode == "Classification impurity":
         render_classification_tree_panel()
     else:
@@ -479,9 +615,11 @@ def render_decision_tree_tab():
 def render_classification_tree_panel():
     with st.form("classification_tree_form", border=True):
         class_counts, _ = matrix_input("Class counts by node", "tree_counts", default="2 5\n6 0")
-        measure = st.selectbox("Impurity measure", ("all", *CLASSIFICATION_MEASURES))
+        measure = st.selectbox("Impurity measure", ("all", *CLASSIFICATION_MEASURES), key="tree_measure")
         submitted = st.form_submit_button("Calculate")
 
+    if submitted:
+        save_persisted_state()
     if not submitted:
         return
     if class_counts is None:
@@ -525,11 +663,13 @@ def render_regression_tree_panel():
             Y, _ = matrix_input("y values", "tree_y", default="2.1\n1.5\n5.8\n6.1\n9.1\n9.5")
         controls = st.columns(2)
         with controls[0]:
-            threshold_text = st.text_input("Decision threshold", value="")
+            threshold_text = st.text_input("Decision threshold", value="", key="tree_threshold")
         with controls[1]:
-            find_best = st.checkbox("Find best one-level split", value=True)
+            find_best = st.checkbox("Find best one-level split", value=True, key="tree_find_best")
         submitted = st.form_submit_button("Calculate")
 
+    if submitted:
+        save_persisted_state()
     if not submitted:
         return
     if X is None or Y is None:
@@ -577,6 +717,7 @@ def render_cache_tab():
     with top_left:
         if st.button("Clear cache", disabled=not cache, width="stretch"):
             st.session_state.matrix_cache = []
+            save_persisted_state()
             st.rerun()
     with top_right:
         st.markdown(
@@ -649,6 +790,7 @@ def transpose_matrix_input(raw_key, allow_mixed):
     except Exception:
         return
     st.session_state[raw_key] = matrix_editor_text(as_2d_any(value).T)
+    save_persisted_state()
 
 
 def parse_matrix(raw_text, allow_mixed=False):
@@ -1125,10 +1267,12 @@ def record_matrix(name, source, value, kind):
             "created_at": time.strftime("%H:%M:%S"),
         },
     )
+    save_persisted_state()
 
 
 def remove_cache_item(entry_id):
     st.session_state.matrix_cache = [entry for entry in st.session_state.matrix_cache if entry["id"] != entry_id]
+    save_persisted_state()
 
 
 def cache_label(entry):
@@ -1159,7 +1303,7 @@ def clipboard_button(text, label, entry_id):
     payload = json.dumps(text).replace("</", "<\\/")
     reset_label = json.dumps(label).replace("</", "<\\/")
     safe_label = html.escape(label)
-    components.html(
+    st.iframe(
         f"""
         <style>
         html, body {{
