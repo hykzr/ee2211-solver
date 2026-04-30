@@ -24,6 +24,7 @@ from PolynomialRegression import fit_polynomial_regression, predict_polynomial_r
 from RidgePolynomialRegression import fit_ridge_poly_regression, predict_ridge_poly_regression
 from RidgeRegression import fit_ridge_regression, predict_ridge_regression
 from pearson_correlation import pearson_correlation
+from webui import fit_regression_model
 
 
 @contextlib.contextmanager
@@ -97,6 +98,25 @@ class SolverComputationTests(unittest.TestCase):
         expected = poly.transform(np.array([[4]], dtype=float)) @ w
         np.testing.assert_allclose(y_predicted, expected, atol=1e-10)
 
+    def test_gui_regression_optional_test_mse(self):
+        result = fit_regression_model(
+            X=np.array([[0], [1], [2], [3]], dtype=float),
+            Y=np.array([[1], [3], [5], [7]], dtype=float),
+            X_test=np.array([[4], [5]], dtype=float),
+            Y_test=np.array([[9], [12]], dtype=float),
+            model_type="Linear",
+            order=1,
+            target_mode="Numeric regression",
+            regularization="None",
+            ridge_lambda=1.0,
+            ridge_form="auto",
+            include_bias=True,
+        )
+
+        np.testing.assert_allclose(result["test_pred"], [[9], [11]], atol=1e-10)
+        np.testing.assert_allclose(result["test_sse"], [[1]], atol=1e-10)
+        np.testing.assert_allclose(result["test_mse"], [[0.5]], atol=1e-10)
+
     def test_onehot_classification(self):
         X = add_bias_column(np.array([[0], [1], [2], [3]], dtype=float))
         y = np.array([["low"], ["low"], ["high"], ["high"]], dtype=object)
@@ -124,6 +144,20 @@ class SolverComputationTests(unittest.TestCase):
             pearson = pearson_correlation(X, Y)
         np.testing.assert_allclose(pearson[0, 0], 1.0, atol=1e-10)
         np.testing.assert_allclose(pearson[1, 0], 1 / np.sqrt(1.25), atol=1e-10)
+
+    def test_pearson_correlation_for_multiple_feature_and_output_columns(self):
+        X = np.array([[1, 1], [2, 1], [3, 2], [4, 2]], dtype=float)
+        Y = np.array([[2, 1, 4], [4, 1, 3], [6, 2, 2], [8, 2, 1]], dtype=float)
+        expected = np.empty((X.shape[1], Y.shape[1]))
+        for x_index in range(X.shape[1]):
+            for y_index in range(Y.shape[1]):
+                expected[x_index, y_index] = np.corrcoef(X[:, x_index], Y[:, y_index])[0, 1]
+
+        with quiet_stdout():
+            pearson = pearson_correlation(X, Y)
+
+        self.assertEqual(pearson.shape, (2, 3))
+        np.testing.assert_allclose(pearson, expected, atol=1e-10)
 
     def test_gradient_descent_lecture_and_past_paper_examples(self):
         _, _, history = gradient_descent("x**2", variables=["x"], initial_values=[1], learning_rate=0.4, iterations=4)

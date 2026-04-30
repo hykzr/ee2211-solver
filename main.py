@@ -9,6 +9,7 @@ from CommonUtils import (
 	ensure_2d,
 	format_number,
 	pretty_print_array,
+	print_error_summary,
 	validate_same_feature_count,
 	validate_same_sample_count,
 )
@@ -454,6 +455,7 @@ def run_linear_regression():
 	X_test_model = add_bias_column(X_test) if include_bias else X_test
 	y_predicted = X_test_model @ w
 	pretty_print_array("y_predicted", y_predicted, show_python=False, show_rank=False)
+	print_optional_test_error(y_predicted)
 	cache_result(y_predicted)
 
 
@@ -472,6 +474,7 @@ def run_polynomial_regression():
 		return
 	validate_same_feature_count(X, X_test)
 	y_predicted = predict_polynomial_regression(poly, w, X_test)
+	print_optional_test_error(y_predicted)
 	cache_result(y_predicted)
 
 
@@ -493,6 +496,7 @@ def run_ridge_regression():
 	validate_same_feature_count(X, X_test)
 	X_test_model = add_bias_column(X_test)
 	y_predicted = predict_ridge_regression(w, X_test_model)
+	print_optional_test_error(y_predicted)
 	cache_result(y_predicted)
 
 
@@ -513,7 +517,21 @@ def run_ridge_polynomial_regression():
 		return
 	validate_same_feature_count(X, X_test)
 	y_predicted = predict_ridge_poly_regression(poly, w, X_test)
+	print_optional_test_error(y_predicted)
 	cache_result(y_predicted)
+
+
+def print_optional_test_error(y_predicted):
+	Y_test = input_optional_array("Y_test")
+	if Y_test is None:
+		return
+	validate_same_sample_count(y_predicted, Y_test)
+	if y_predicted.shape[1] != Y_test.shape[1]:
+		raise ValueError(
+			f"Output count mismatch: y_predicted has {y_predicted.shape[1]} column(s) "
+			f"but Y_test has {Y_test.shape[1]} column(s)."
+		)
+	print_error_summary(Y_test, y_predicted, prefix="test")
 
 
 def run_onehot_linearclassification():
@@ -555,10 +573,6 @@ def run_onehot_polynomial_classification():
 def run_pearson_correlation():
 	X = input_array("X")
 	Y = input_array("Y")
-	if X.shape[1] != Y.shape[1]:
-		raise ValueError(
-			f"Pearson correlation expects matching observation counts: X has {X.shape[1]}, Y has {Y.shape[1]}."
-		)
 	cache_result(pearson_correlation(X, Y))
 
 
