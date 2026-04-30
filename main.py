@@ -142,10 +142,6 @@ def parse_mixed_array(raw_text):
 		return np.asarray(rows, dtype=object)
 
 
-def print_array(name, array):
-	pretty_print_array(name, array)
-
-
 def cache_input(array):
 	global LAST_INPUT
 	LAST_INPUT = ensure_2d(array)
@@ -156,99 +152,6 @@ def cache_result(array):
 	global LAST_RESULT
 	LAST_RESULT = ensure_2d(array)
 	return LAST_RESULT
-
-
-def _legacy_input_array(name, allow_last_result=True):
-	print_section(f"Input {name}")
-	if VERBOSE:
-		print(INPUT_HELP)
-	lines = []
-
-	while True:
-		line = input("> ").strip().replace("−", "-")
-		if not line:
-			if lines:
-				break
-			print("Enter at least one row.")
-			continue
-
-		if not lines and line == "-":
-			if LAST_INPUT is None:
-				print("No cached input is available.")
-				continue
-			return cache_input(LAST_INPUT)
-
-		if not lines and line == "_" and allow_last_result:
-			if LAST_RESULT is None:
-				print("No cached result is available.")
-				continue
-			return cache_input(LAST_RESULT)
-
-		lines.append(line)
-
-	try:
-		return cache_input(parse_numeric_array("\n".join(lines)))
-	except (SyntaxError, ValueError) as exc:
-		print(f"Input error: {exc}")
-		return input_array(name, allow_last_result=allow_last_result)
-
-
-def _legacy_input_optional_array(name, allow_last_result=True):
-	print_section(f"Input {name}")
-	if VERBOSE:
-		print(INPUT_HELP)
-	print("Leave the first line empty to skip this input and return to the main menu after fitting.")
-	lines = []
-
-	while True:
-		line = input("> ").strip().replace("−", "-")
-		if not line:
-			if not lines:
-				return None
-			break
-
-		if not lines and line == "-":
-			if LAST_INPUT is None:
-				print("No cached input is available.")
-				continue
-			return cache_input(LAST_INPUT)
-
-		if not lines and line == "_" and allow_last_result:
-			if LAST_RESULT is None:
-				print("No cached result is available.")
-				continue
-			return cache_input(LAST_RESULT)
-
-		lines.append(line)
-
-	try:
-		return cache_input(parse_numeric_array("\n".join(lines)))
-	except (SyntaxError, ValueError) as exc:
-		print(f"Input error: {exc}")
-		return input_optional_array(name, allow_last_result=allow_last_result)
-
-
-def _legacy_input_target_array(name):
-	print_section(f"Input {name}")
-	if VERBOSE:
-		print(INPUT_HELP)
-	print("For classification targets, you may enter one-hot rows or labels such as class1;class2;class3.")
-	lines = []
-
-	while True:
-		line = input("> ").strip().replace("−", "-")
-		if not line:
-			if lines:
-				break
-			print("Enter at least one row.")
-			continue
-		lines.append(line)
-
-	try:
-		return parse_mixed_array("\n".join(lines))
-	except (SyntaxError, ValueError) as exc:
-		print(f"Input error: {exc}")
-		return input_target_array(name)
 
 
 def prompt_float(prompt, default=None):
@@ -511,7 +414,7 @@ def inspect_array_details(array):
 def inspect_array():
 	array = input_array("array")
 	cache_result(array)
-	print_array("array", array)
+	pretty_print_array("array", array)
 	inspect_array_details(array)
 
 
@@ -714,12 +617,12 @@ def show_cache():
 	if LAST_INPUT is None:
 		print("Last input: [empty]")
 	else:
-		print_array("last_input", LAST_INPUT)
+		pretty_print_array("last_input", LAST_INPUT)
 
 	if LAST_RESULT is None:
 		print("Last result: [empty]")
 	else:
-		print_array("last_result", LAST_RESULT)
+		pretty_print_array("last_result", LAST_RESULT)
 
 
 def process_input():
