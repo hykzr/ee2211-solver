@@ -21,6 +21,7 @@ from DecisionTreeUtils import (
 	find_best_regression_split,
 )
 from GradientDescent import gradient_descent, infer_variables, print_gradient_descent_result
+from KMeansUtils import k_means, print_k_means_result
 
 from LinearRegression import linear_regression
 from OneHotLinearClassification import (
@@ -51,6 +52,7 @@ MENU_TEXT = """EE2211 Solver
 | 12. Gradient descent                                   |
 | 13. Classification tree impurity                       |
 | 14. Regression tree MSE/split                          |
+| 15. K-means clustering                                 |
 +--------------------------------------------------------+"""
 
 INPUT_HELP = (
@@ -183,6 +185,21 @@ def prompt_int(prompt, default=None, minimum=None):
 			print(f"Please enter an integer greater than or equal to {minimum}.")
 			continue
 		return value
+
+
+def prompt_optional_int(prompt):
+	raw = input(f"{prompt} [none]: ").strip()
+	if not raw:
+		return None
+	try:
+		value = int(raw)
+	except ValueError:
+		print("Please enter an integer or leave blank for none.")
+		return prompt_optional_int(prompt)
+	if value < 1:
+		print("Please enter an integer greater than or equal to 1, or leave blank for none.")
+		return prompt_optional_int(prompt)
+	return value
 
 
 def prompt_yes_no(prompt, default=True):
@@ -626,6 +643,18 @@ def run_regression_tree_mse():
 		cache_result([[best["threshold"]], [best["overall_mse"]]])
 
 
+def run_k_means():
+	print_section("K-means Clustering")
+	print("Input rows are feature vectors. Centroid rows define k. Cluster labels are shown as 1..k.")
+	X = input_array("points")
+	centroids = input_array("initial centroids")
+	max_iterations = prompt_optional_int("Max iterations")
+	history = k_means(X, centroids, max_iterations=max_iterations)
+	print_k_means_result(history)
+	if history:
+		cache_result(history[-1]["centroids"])
+
+
 def show_cache():
 	print_section("Cached Arrays")
 	if LAST_INPUT is None:
@@ -687,6 +716,10 @@ def process_input():
 		"tree mse": run_regression_tree_mse,
 		"regression tree": run_regression_tree_mse,
 		"split": run_regression_tree_mse,
+		"15": run_k_means,
+		"kmeans": run_k_means,
+		"k-means": run_k_means,
+		"k means": run_k_means,
 	}
 
 	if option in {"0", "exit", "quit", "q"}:

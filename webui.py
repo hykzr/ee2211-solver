@@ -30,6 +30,7 @@ from DecisionTreeUtils import (
     regression_threshold_summary,
 )
 from GradientDescent import gradient_descent, infer_variables
+from KMeansUtils import k_means
 from OneHotLinearClassification import prepare_class_targets
 from main import parse_mixed_array, parse_numeric_array
 from pearson_correlation import pearson_correlation_details
@@ -73,6 +74,9 @@ PERSISTED_WIDGET_KEYS = (
     "tree_y_raw",
     "tree_threshold",
     "tree_find_best",
+    "kmeans_x_raw",
+    "kmeans_centroids_raw",
+    "kmeans_max_iterations",
 )
 
 
@@ -90,6 +94,7 @@ def main():
             "Pearson",
             "Gradient",
             "Decision Tree",
+            "K-means",
             "Cache",
         ]
     )
@@ -106,6 +111,8 @@ def main():
     with tabs[5]:
         render_decision_tree_tab()
     with tabs[6]:
+        render_kmeans_tab()
+    with tabs[7]:
         render_cache_tab()
 
 
@@ -710,6 +717,56 @@ def render_regression_tree_panel():
         render_threshold_summary(best)
 
 
+def render_kmeans_tab():
+    st.subheader("K-means Clustering")
+    with st.form("kmeans_form", border=True):
+        col_x, col_c = st.columns(2)
+        with col_x:
+            X, _ = matrix_input("Points X", "kmeans_x", default="1 1\n1.5 2\n3 4\n5 7\n3.5 5\n4.5 5\n3.5 4.5")
+        with col_c:
+            centroids, _ = matrix_input("Initial centroids", "kmeans_centroids", default="1 1\n5 7")
+        max_iterations_text = st.text_input("Max iterations", value="", key="kmeans_max_iterations")
+        submitted = st.form_submit_button("Run")
+
+    if submitted:
+        save_persisted_state()
+    if not submitted:
+        return
+    if X is None or centroids is None:
+        st.error("Both point and centroid matrices are required.")
+        return
+
+    try:
+        max_iterations = parse_optional_positive_int(max_iterations_text, "Max iterations")
+        history = k_means(X, centroids, max_iterations=max_iterations)
+    except Exception as exc:
+        st.error(str(exc))
+        return
+
+    record_matrix("X", "K-means input", X, kind="input")
+    record_matrix("initial_centroids", "K-means input", centroids, kind="input")
+    if history:
+        record_matrix("final_centroids", "K-means result", history[-1]["centroids"], kind="output")
+        record_matrix("clusters", "K-means result", (history[-1]["assignments"] + 1).reshape(-1, 1), kind="output")
+
+    st.markdown("#### Result")
+    render_metrics(
+        {
+            "points": X.shape[0],
+            "features": X.shape[1],
+            "k": centroids.shape[0],
+            "iterations": len(history),
+        }
+    )
+    for item in history:
+        title = f"Iteration {item['iteration']}"
+        if item["converged"]:
+            title += " - converged"
+        with st.expander(title, expanded=True):
+            render_matrix("centroids", item["centroids"])
+            st.dataframe(kmeans_iteration_frame(item["assignments"]), width="stretch", hide_index=True)
+
+
 def render_cache_tab():
     st.subheader("Cache")
     cache = st.session_state.matrix_cache
@@ -927,7 +984,7 @@ def fit_regression_model(
         X_test = numeric_matrix(X_test)
         validate_same_feature_count(X, X_test)
         X_test_model = transform_test_matrix(X_test, model_type, include_bias, poly)
-        test_pred = X_test_model @ w
+        test_pred = X_test_model @ w # type: ignore
         test_class = classify_predictions(test_pred, resolved_target_mode, class_labels)
         if Y_test is not None:
             test_target_matrix = prepare_test_target_matrix(Y_test, resolved_target_mode, class_labels)
@@ -1057,6 +1114,19 @@ def parse_initial_values(raw_text, expected):
     return np.asarray([float(part) for part in parts], dtype=float)
 
 
+def parse_optional_positive_int(raw_text, label):
+    text = raw_text.strip()
+    if not text:
+        return None
+    try:
+        value = int(text)
+    except ValueError:
+        raise ValueError(f"{label} must be a positive integer or left empty.") from None
+    if value < 1:
+        raise ValueError(f"{label} must be a positive integer or left empty.")
+    return value
+
+
 def gradient_history_frame(history, variables):
     rows = []
     for item in history:
@@ -1068,6 +1138,15 @@ def gradient_history_frame(history, variables):
         row["cost"] = format_number(item["cost"])
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def kmeans_iteration_frame(assignments):
+    return pd.DataFrame(
+        [
+            {"point": index + 1, "cluster": int(cluster) + 1}
+            for index, cluster in enumerate(np.asarray(assignments).reshape(-1).tolist())
+        ]
+    )
 
 
 def render_threshold_summary(summary):

@@ -13,6 +13,7 @@ from CommonUtils import (
 )
 from DecisionTreeUtils import classification_impurity_summary, find_best_regression_split, regression_threshold_summary
 from GradientDescent import gradient_descent
+from KMeansUtils import k_means
 from LinearRegression import linear_regression
 from OneHotLinearClassification import (
     fit_onehot_linearclassification,
@@ -191,6 +192,34 @@ class SolverComputationTests(unittest.TestCase):
         best, summaries = find_best_regression_split(x, y)
         self.assertEqual(len(summaries), len(np.unique(x)) - 1)
         self.assertLessEqual(best["overall_mse"], summary["overall_mse"])
+
+    def test_k_means_runs_until_convergence(self):
+        X = np.array([[1, 1], [1.5, 2], [5, 7], [6, 8]], dtype=float)
+        initial_centroids = np.array([[1, 1], [5, 7]], dtype=float)
+
+        history = k_means(X, initial_centroids)
+
+        self.assertTrue(history[-1]["converged"])
+        self.assertEqual(len(history), 2)
+        np.testing.assert_array_equal(history[-1]["assignments"], [0, 0, 1, 1])
+        np.testing.assert_allclose(history[-1]["centroids"], [[1.25, 1.5], [5.5, 7.5]], atol=1e-10)
+
+    def test_k_means_max_iterations_stops_early(self):
+        X = np.array([[1, 1], [1.5, 2], [5, 7], [6, 8]], dtype=float)
+        initial_centroids = np.array([[1, 1], [5, 7]], dtype=float)
+
+        history = k_means(X, initial_centroids, max_iterations=1)
+
+        self.assertEqual(len(history), 1)
+        self.assertFalse(history[-1]["converged"])
+        np.testing.assert_allclose(history[-1]["centroids"], [[1.25, 1.5], [5.5, 7.5]], atol=1e-10)
+
+    def test_k_means_validates_dimensions(self):
+        X = np.array([[1, 2], [3, 4]], dtype=float)
+        centroids = np.array([[1, 2, 3]], dtype=float)
+
+        with self.assertRaisesRegex(ValueError, "Feature dimension mismatch"):
+            k_means(X, centroids)
 
 
 if __name__ == "__main__":

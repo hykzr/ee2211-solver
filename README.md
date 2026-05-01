@@ -15,6 +15,7 @@ line.
 - Run one-hot linear and polynomial classification workflows.
 - Calculate Pearson correlation for one or more input/output columns.
 - Step through symbolic gradient descent expressions with SymPy.
+- Run K-means clustering from a point matrix and initial centroid matrix.
 - Compute classification-tree impurity using Gini, entropy, or classification
   error.
 - Evaluate one-level regression-tree MSE splits and find the best threshold.
