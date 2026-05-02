@@ -44,7 +44,10 @@ MATRIX_HELP = (
 RIDGE_FORMS = ("auto", "primal form", "dual form")
 STATE_FILE = Path(__file__).resolve().parent / "temp" / "webui_state.json"
 STATE_VERSION = 1
+DEFAULT_MAX_ALLOWED_CACHE = 50
+CACHE_LIMIT_KEY = "max_allowed_cache"
 PERSISTED_WIDGET_KEYS = (
+    CACHE_LIMIT_KEY,
     "array_inspect_raw",
     "solve_equation",
     "solve_x_raw",
@@ -203,6 +206,8 @@ def ensure_state():
         st.session_state._solver_state_loaded = True
     if "matrix_cache" not in st.session_state:
         st.session_state.matrix_cache = []
+    ensure_cache_limit()
+    trim_matrix_cache()
 
 
 def load_persisted_state():
@@ -245,6 +250,33 @@ def save_persisted_state():
 
 def persisted_widget_values():
     return {key: json_safe_value(st.session_state[key]) for key in PERSISTED_WIDGET_KEYS if key in st.session_state}
+
+
+def ensure_cache_limit():
+    try:
+        limit = int(st.session_state.get(CACHE_LIMIT_KEY, DEFAULT_MAX_ALLOWED_CACHE))
+    except (TypeError, ValueError):
+        limit = DEFAULT_MAX_ALLOWED_CACHE
+    normalized = max(1, limit)
+    if st.session_state.get(CACHE_LIMIT_KEY) != normalized:
+        st.session_state[CACHE_LIMIT_KEY] = normalized
+
+
+def max_allowed_cache():
+    try:
+        return max(1, int(st.session_state.get(CACHE_LIMIT_KEY, DEFAULT_MAX_ALLOWED_CACHE)))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_ALLOWED_CACHE
+
+
+def trim_matrix_cache():
+    limit = max_allowed_cache()
+    st.session_state.matrix_cache = st.session_state.get("matrix_cache", [])[:limit]
+
+
+def on_cache_limit_change():
+    trim_matrix_cache()
+    save_persisted_state()
 
 
 def serialize_cache_entry(entry):
@@ -785,16 +817,27 @@ def render_kmeans_tab():
 
 def render_cache_tab():
     st.subheader("Cache")
+    ensure_cache_limit()
     cache = st.session_state.matrix_cache
-    top_left, top_right = st.columns([1, 3])
+    top_left, top_middle, top_right = st.columns([1, 1.2, 2.8])
     with top_left:
         if st.button("Clear cache", disabled=not cache, width="stretch"):
             st.session_state.matrix_cache = []
             save_persisted_state()
             st.rerun()
+    with top_middle:
+        st.number_input(
+            "Max allowed cache",
+            min_value=1,
+            max_value=1000,
+            step=1,
+            key=CACHE_LIMIT_KEY,
+            on_change=on_cache_limit_change,
+        )
     with top_right:
         st.markdown(
-            f'<div class="solver-meta">{len(cache)} cached matrix item{"s" if len(cache) != 1 else ""}</div>',
+            f'<div class="solver-meta">{len(cache)} of {max_allowed_cache()} cached matrix item'
+            f'{"s" if len(cache) != 1 else ""}</div>',
             unsafe_allow_html=True,
         )
 
@@ -1362,6 +1405,7 @@ def record_matrix(name, source, value, kind):
             "created_at": time.strftime("%H:%M:%S"),
         },
     )
+    trim_matrix_cache()
     save_persisted_state()
 
 
