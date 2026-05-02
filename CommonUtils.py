@@ -1,3 +1,5 @@
+import ast
+
 import numpy as np
 import sympy as sp
 
@@ -9,6 +11,105 @@ def ensure_2d(array):
     if arr.ndim == 1:
         return arr.reshape(-1, 1)
     return arr
+
+
+def normalize_array_text(raw_text):
+    return (
+        raw_text.strip()
+        .replace("âˆ’", "-")
+        .replace("â€“", "-")
+        .replace("ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢", "-")
+        .replace("Ã¢Ë†â€™", "-")
+        .replace("(", "[")
+        .replace(")", "]")
+        .replace("{", "[")
+        .replace("}", "]")
+    )
+
+
+def delimited_array_text(text):
+    stripped = text.strip()
+    while stripped.startswith("[") and stripped.endswith("]"):
+        stripped = stripped[1:-1].strip()
+    return stripped
+
+
+def parse_numeric_array(raw_text):
+    text = normalize_array_text(raw_text)
+    if not text:
+        raise ValueError("Input is empty.")
+    if "\n" in text or "\r" in text:
+        raise ValueError("New lines are not supported. Separate rows with ';' or use a one-line Python array.")
+
+    if text.startswith("["):
+        try:
+            parsed = ast.literal_eval(text)
+            return ensure_2d(parsed)
+        except (SyntaxError, ValueError):
+            text = delimited_array_text(text)
+
+    rows = []
+    for line in text.replace(";", "\n").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if "," in stripped:
+            parts = [part.strip() for part in stripped.split(",") if part.strip()]
+        else:
+            parts = [part for part in stripped.split() if part]
+        rows.append([float(part) for part in parts])
+
+    if not rows:
+        raise ValueError("No numeric rows were found.")
+
+    widths = {len(row) for row in rows}
+    if len(widths) != 1:
+        raise ValueError("All rows must have the same number of values.")
+
+    return ensure_2d(rows)
+
+
+def parse_mixed_array(raw_text):
+    text = normalize_array_text(raw_text)
+    if not text:
+        raise ValueError("Input is empty.")
+    if "\n" in text or "\r" in text:
+        raise ValueError("New lines are not supported. Separate rows with ';' or use a one-line Python array.")
+
+    try:
+        return parse_numeric_array(text)
+    except (SyntaxError, ValueError):
+        if text.startswith("["):
+            try:
+                parsed = ast.literal_eval(text)
+                arr = np.asarray(parsed, dtype=object)
+                if arr.ndim == 0:
+                    return arr.reshape(1, 1)
+                if arr.ndim == 1:
+                    return arr.reshape(-1, 1)
+                return arr
+            except (SyntaxError, ValueError):
+                text = delimited_array_text(text)
+
+        rows = []
+        for line in text.replace(";", "\n").splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if "," in stripped:
+                parts = [part.strip() for part in stripped.split(",") if part.strip()]
+            else:
+                parts = [stripped]
+            rows.append(parts)
+
+        if not rows:
+            raise ValueError("No rows were found.")
+
+        widths = {len(row) for row in rows}
+        if len(widths) != 1:
+            raise ValueError("All rows must have the same number of values.")
+
+        return np.asarray(rows, dtype=object)
 
 
 def system_type(matrix):

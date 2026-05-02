@@ -18,6 +18,8 @@ from CommonUtils import (
     calculate_closed_form_weights,
     calculate_ridge_weights,
     format_number,
+    parse_mixed_array,
+    parse_numeric_array,
     python_array_literal,
     squared_error_summary,
     validate_same_feature_count,
@@ -32,7 +34,6 @@ from DecisionTreeUtils import (
 from GradientDescent import gradient_descent, infer_variables
 from KMeansUtils import k_means
 from OneHotLinearClassification import prepare_class_targets
-from main import parse_mixed_array, parse_numeric_array
 from pearson_correlation import pearson_correlation_details
 
 
@@ -397,7 +398,14 @@ def render_regression_tab():
             include_bias = st.checkbox("Add bias for linear model", value=True, key="reg_include_bias")
     if regularization == "Ridge":
         with controls[1]:
-            ridge_lambda = st.number_input("Lambda", min_value=0.0, value=1.0, step=0.1, key="reg_ridge_lambda")
+            ridge_lambda = st.number_input(
+                "Lambda",
+                min_value=0.0,
+                value=1.0,
+                step=0.1,
+                format="%.10g",
+                key="reg_ridge_lambda",
+            )
         with controls[2]:
             ridge_form = st.selectbox("Ridge form", RIDGE_FORMS, key="reg_ridge_form")
 
@@ -565,7 +573,14 @@ def render_gradient_tab():
         values_text = st.text_input("Initial values", value="3, 2", key="gradient_initial_values")
         controls = st.columns(3)
         with controls[0]:
-            learning_rate = st.number_input("Learning rate", min_value=0.0, value=0.2, step=0.05, key="gradient_learning_rate")
+            learning_rate = st.number_input(
+                "Learning rate",
+                min_value=0.0,
+                value=0.2,
+                step=0.05,
+                format="%.10g",
+                key="gradient_learning_rate",
+            )
         with controls[1]:
             iterations = st.number_input("Iterations", min_value=1, max_value=10000, value=10, step=1, key="gradient_iterations")
         with controls[2]:
@@ -759,10 +774,11 @@ def render_kmeans_tab():
         }
     )
     for item in history:
-        title = f"Iteration {item['iteration']}"
+        title = "Initial clusters" if item["iteration"] == 0 else f"Iteration {item['iteration']}"
         if item["converged"]:
             title += " - converged"
         with st.expander(title, expanded=True):
+            render_metrics({"cost": format_number(item["cost"])})
             render_matrix("centroids", item["centroids"])
             st.dataframe(kmeans_iteration_frame(item["assignments"]), width="stretch", hide_index=True)
 

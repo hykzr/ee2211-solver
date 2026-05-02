@@ -1,4 +1,3 @@
-import ast
 import os
 from traceback import print_exc
 
@@ -8,6 +7,8 @@ from CommonUtils import (
 	add_bias_column,
 	ensure_2d,
 	format_number,
+	parse_mixed_array,
+	parse_numeric_array,
 	pretty_print_array,
 	print_error_summary,
 	validate_same_feature_count,
@@ -72,78 +73,6 @@ def clear():
 
 def print_section(title):
 	print(f"\n{title}\n{'=' * len(title)}")
-
-def parse_numeric_array(raw_text):
-	text = raw_text.strip()
-	if not text:
-		raise ValueError("Input is empty.")
-	if "\n" in text or "\r" in text:
-		raise ValueError("New lines are not supported. Separate rows with ';' or use a one-line Python array.")
-
-	if text.startswith("[") or text.startswith("("):
-		parsed = ast.literal_eval(text)
-		return ensure_2d(parsed)
-
-	rows = []
-	for line in text.replace(";", "\n").splitlines():
-		stripped = line.strip()
-		if not stripped:
-			continue
-		if "," in stripped:
-			parts = [part.strip() for part in stripped.split(",") if part.strip()]
-		else:
-			parts = [part for part in stripped.split() if part]
-		rows.append([float(part) for part in parts])
-
-	if not rows:
-		raise ValueError("No numeric rows were found.")
-
-	widths = {len(row) for row in rows}
-	if len(widths) != 1:
-		raise ValueError("All rows must have the same number of values.")
-
-	return ensure_2d(rows)
-
-
-def parse_mixed_array(raw_text):
-	text = raw_text.strip()
-	if not text:
-		raise ValueError("Input is empty.")
-	if "\n" in text or "\r" in text:
-		raise ValueError("New lines are not supported. Separate rows with ';' or use a one-line Python array.")
-
-	try:
-		return parse_numeric_array(raw_text)
-	except (SyntaxError, ValueError):
-		if text.startswith("[") or text.startswith("("):
-			parsed = ast.literal_eval(text)
-			arr = np.asarray(parsed, dtype=object)
-			if arr.ndim == 0:
-				return arr.reshape(1, 1)
-			if arr.ndim == 1:
-				return arr.reshape(-1, 1)
-			return arr
-
-		rows = []
-		for line in text.replace(";", "\n").splitlines():
-			stripped = line.strip()
-			if not stripped:
-				continue
-			if "," in stripped:
-				parts = [part.strip() for part in stripped.split(",") if part.strip()]
-			else:
-				parts = [stripped]
-			rows.append(parts)
-
-		if not rows:
-			raise ValueError("No rows were found.")
-
-		widths = {len(row) for row in rows}
-		if len(widths) != 1:
-			raise ValueError("All rows must have the same number of values.")
-
-		return np.asarray(rows, dtype=object)
-
 
 def cache_input(array):
 	global LAST_INPUT

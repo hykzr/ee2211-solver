@@ -22,29 +22,28 @@ def gradient_descent(cost_expression, variables=None, initial_values=None, learn
         raise ValueError(f"Expected {len(symbols)} initial values, got {values.size}.")
 
     gradient_expressions = [sp.diff(expression, symbol) for symbol in symbols]
+    initial_gradient = _evaluate_gradient(gradient_expressions, symbols, values)
     history = [
         {
             "iteration": 0,
             "values": values.copy(),
-            "gradient": np.full(values.shape, np.nan),
+            "gradient": initial_gradient.copy(),
             "cost": _evaluate_expression(expression, symbols, values),
         }
     ]
 
     for iteration in range(1, int(iterations) + 1):
-        gradient = np.array(
-            [_evaluate_expression(grad_expr, symbols, values) for grad_expr in gradient_expressions],
-            dtype=float,
-        )
+        gradient = history[-1]["gradient"]
         next_values = values - float(learning_rate) * gradient
         next_cost = _evaluate_expression(expression, symbols, next_values)
+        next_gradient = _evaluate_gradient(gradient_expressions, symbols, next_values)
         previous_cost = history[-1]["cost"]
 
         history.append(
             {
                 "iteration": iteration,
                 "values": next_values.copy(),
-                "gradient": gradient.copy(),
+                "gradient": next_gradient.copy(),
                 "cost": next_cost,
             }
         )
@@ -65,12 +64,13 @@ def print_gradient_descent_result(expression, variables, gradient_expressions, h
         print(f"dC/d{variable} = {sp.sstr(gradient)}")
     print("")
 
-    header = ["iter", *variables, "cost"]
+    header = ["iter", *variables, *(f"dC/d{variable}" for variable in variables), "cost"]
     print(" | ".join(header))
     print("-" * (len(" | ".join(header)) + 8))
     for item in history:
         row = [str(item["iteration"])]
         row.extend(format_number(value) for value in item["values"])
+        row.extend(format_number(value) for value in item["gradient"])
         row.append(format_number(item["cost"]))
         print(" | ".join(row))
 
@@ -85,3 +85,10 @@ def _evaluate_expression(expression, symbols, values):
         return float(result)    
     except (TypeError, ValueError):
         raise ValueError(f"Failed to convert expression {result} to float")
+
+
+def _evaluate_gradient(gradient_expressions, symbols, values):
+    return np.array(
+        [_evaluate_expression(grad_expr, symbols, values) for grad_expr in gradient_expressions],
+        dtype=float,
+    )

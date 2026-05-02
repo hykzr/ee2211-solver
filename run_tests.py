@@ -8,6 +8,8 @@ from CommonUtils import (
     add_bias_column,
     calculate_closed_form_weights,
     calculate_ridge_weights,
+    parse_mixed_array,
+    parse_numeric_array,
     pretty_print_array,
     print_error_summary,
 )
@@ -35,6 +37,12 @@ def quiet_stdout():
 
 
 class SolverComputationTests(unittest.TestCase):
+    def test_common_array_parsing_accepts_bracket_variants(self):
+        np.testing.assert_allclose(parse_numeric_array("(1 2; 3 4)"), [[1, 2], [3, 4]])
+        np.testing.assert_allclose(parse_numeric_array("{1, 2; 3, 4}"), [[1, 2], [3, 4]])
+        np.testing.assert_allclose(parse_numeric_array("{[1, 2], [3, 4]}"), [[1, 2], [3, 4]])
+        np.testing.assert_array_equal(parse_mixed_array("{cat; dog}"), np.asarray([["cat"], ["dog"]], dtype=object))
+
     def test_single_value_arrays_print_inline(self):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -165,12 +173,18 @@ class SolverComputationTests(unittest.TestCase):
         np.testing.assert_allclose(history[-1]["values"], [0.0016], atol=1e-12)
 
         _, _, history = gradient_descent("sin(w)**2", variables=["w"], initial_values=[3], learning_rate=0.1, iterations=1)
-        np.testing.assert_allclose(history[1]["gradient"], [2 * np.sin(3) * np.cos(3)], atol=1e-12)
+        np.testing.assert_allclose(history[0]["gradient"], [2 * np.sin(3) * np.cos(3)], atol=1e-12)
         np.testing.assert_allclose(history[1]["values"], [3.0279415498198925], atol=1e-12)
+        np.testing.assert_allclose(
+            history[1]["gradient"],
+            [2 * np.sin(history[1]["values"][0]) * np.cos(history[1]["values"][0])],
+            atol=1e-12,
+        )
 
         _, _, history = gradient_descent("x**2 + x*y**2", variables=["x", "y"], initial_values=[3, 2], learning_rate=0.2, iterations=1)
-        np.testing.assert_allclose(history[1]["gradient"], [10, 12], atol=1e-12)
+        np.testing.assert_allclose(history[0]["gradient"], [10, 12], atol=1e-12)
         np.testing.assert_allclose(history[1]["values"], [1, -0.4], atol=1e-12)
+        np.testing.assert_allclose(history[1]["gradient"], [2.16, -0.8], atol=1e-12)
 
     def test_classification_tree_impurity(self):
         _, impurities, overall = classification_impurity_summary([[2, 5], [6, 0]], measure="gini")
@@ -201,8 +215,12 @@ class SolverComputationTests(unittest.TestCase):
 
         self.assertTrue(history[-1]["converged"])
         self.assertEqual(len(history), 2)
+        np.testing.assert_array_equal(history[0]["assignments"], [0, 0, 1, 1])
+        np.testing.assert_allclose(history[0]["centroids"], initial_centroids, atol=1e-10)
+        np.testing.assert_allclose(history[0]["cost"], 3.25, atol=1e-10)
         np.testing.assert_array_equal(history[-1]["assignments"], [0, 0, 1, 1])
         np.testing.assert_allclose(history[-1]["centroids"], [[1.25, 1.5], [5.5, 7.5]], atol=1e-10)
+        np.testing.assert_allclose(history[-1]["cost"], 1.625, atol=1e-10)
 
     def test_k_means_max_iterations_stops_early(self):
         X = np.array([[1, 1], [1.5, 2], [5, 7], [6, 8]], dtype=float)
@@ -210,7 +228,7 @@ class SolverComputationTests(unittest.TestCase):
 
         history = k_means(X, initial_centroids, max_iterations=1)
 
-        self.assertEqual(len(history), 1)
+        self.assertEqual(len(history), 2)
         self.assertFalse(history[-1]["converged"])
         np.testing.assert_allclose(history[-1]["centroids"], [[1.25, 1.5], [5.5, 7.5]], atol=1e-10)
 
