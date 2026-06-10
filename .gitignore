@@ -10,3 +10,6 @@ wheels/
 .venv
 
 temp/
+
+out/
+.DS_Store
