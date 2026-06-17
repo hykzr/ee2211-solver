@@ -1,96 +1,160 @@
 # EE2211 Solver
 
-EE2211 Solver is a small Python toolkit for working through common EE2211-style
-linear algebra, regression, classification, correlation, gradient descent, and
-decision-tree calculations. It provides both a Streamlit WebUI and an
-interactive terminal menu, so you can use it either visually or from the command
-line.
+![EE2211 Solver cover](images/cover.png)
 
-## Features
+EE2211 Solver is a small helper app I made for working through EE2211-style
+machine learning calculation questions faster.
 
-- Parse and inspect numeric arrays, including rank, transpose, inverse, and
-  bias-column helpers.
-- Solve linear systems in both `Xw = y` and `wX = y` forms.
+It is not meant to replace understanding the concepts. The goal is more like:
+let the app handle repeated matrix / regression / gradient / tree / clustering
+calculation steps, so you can spend more exam time thinking about what the
+question is actually asking.
+
+The main way to use it is the Streamlit WebUI. There is also a terminal menu if
+you prefer command line tools, but beginners should start with the WebUI.
+
+## What It Can Do
+
+- Parse matrices and quickly check shape, rank, transpose, inverse, left inverse,
+  and right inverse.
+- Solve linear systems such as `Xw = y` and `wX = y`.
 - Fit linear, polynomial, ridge, and ridge-polynomial regression models.
-- Run one-hot linear and polynomial classification workflows.
-- Calculate Pearson correlation for one or more input/output columns.
-- Step through symbolic gradient descent expressions with SymPy.
-- Run K-means clustering from a point matrix and initial centroid matrix.
-- Compute classification-tree impurity using Gini, entropy, or classification
-  error.
-- Evaluate one-level regression-tree MSE splits and find the best threshold.
-- Cache recent matrices/results in the WebUI for reuse and copy-paste.
+- Run one-hot linear / polynomial classification workflows.
+- Calculate Pearson correlation for one or more columns.
+- Step through symbolic gradient descent with iteration history.
+- Compute decision-tree impurity with Gini, entropy, and classification error.
+- Check one-level regression-tree splits and find the best threshold.
+- Run K-means clustering from points and initial centroids.
+- Cache matrices and results in the WebUI so you can copy and reuse them.
 
-## Requirements
+## Beginner Setup
 
-- Python 3.13 or newer
-- [uv](https://docs.astral.sh/uv/) for dependency management
+You do not need to be good at Python to run this. You mainly need to install one
+tool called `uv`, then copy-paste a few commands.
 
-Project dependencies are declared in [pyproject.toml](pyproject.toml).
+### 0. Install python
 
-## Setup
+### 1. Install `uv`
 
-Install dependencies with uv:
+If you already have `uv`, skip this step.
+
+[Installing uv](https://docs.astral.sh/uv/getting-started/installation/)
+
+### 2. Clone This Repo
+
+```bash
+git clone https://github.com/hykzr/demo-video-recorder.git
+cd demo-video-recorder
+```
+
+### 3. Install The App Dependencies
+
+Run:
 
 ```bash
 uv sync
 ```
 
-## Run The WebUI
+This may take a little while the first time. It installs the Python packages the
+solver needs.
 
-Start the Streamlit interface:
+### 4. Start The WebUI
+
+Run:
 
 ```bash
 uv run streamlit run webui.py
 ```
 
-The WebUI includes tabs for arrays, linear-system solving, regression and
-classification, Pearson correlation, gradient descent, decision trees, and a
-matrix cache. Streamlit will print a local URL in the terminal after startup.
-
-The WebUI stores persisted widget state and cached matrices under `temp/`.
-That directory is intentionally ignored by Git.
-
-## Run The CLI
-
-Start the interactive terminal menu:
-
-```bash
-uv run python main.py
-```
-
-The CLI accepts either menu numbers or shortcuts such as `linear`, `ridge`,
-`pearson`, `gradient`, `impurity`, and `split`.
-
-## Input Format
-
-Most matrix prompts accept one-line arrays in any of these forms:
+Streamlit will print a local link, usually something like:
 
 ```text
-1 2; 3 4
-1, 2; 3, 4
-[[1, 2], [3, 4]]
+http://localhost:8501
 ```
 
-In the WebUI, matrix text areas also accept newline-separated rows:
+Open that link in your browser. That is the solver.
+
+## How To Type Matrices
+
+Most input boxes accept simple rows like this:
 
 ```text
 1 2
 3 4
 ```
 
-For the CLI, rows should stay on one input line and be separated with
-semicolons. The CLI also supports cache shortcuts:
+You can also use semicolons:
 
-- `-` reuses the last input array.
-- `_` reuses the last result array.
+```text
+1 2; 3 4
+```
+
+Or Python-style arrays:
+
+```text
+[[1, 2], [3, 4]]
+```
+
+For long one-dimensional data, a useful trick is to type it sideways first:
+
+```text
+0 1 2 3 4 5
+```
+
+Then click the `Transpose` button to turn it into a column.
+
+## Cache Tip
+
+The WebUI saves recent inputs and results in the `Cache` tab. This is useful
+when you want to copy a model matrix, a weight vector, predictions, centroids,
+or any intermediate result and paste it into another tab.
+
+The app stores temporary WebUI state and cached matrices under `temp/`. That
+folder is ignored by Git.
+
+## Optional: Terminal Version
+
+If you prefer a text menu instead of the browser app, run:
+
+```bash
+uv run python main.py
+```
+
+You can choose menu items by number, or use shortcuts like `linear`, `ridge`,
+`pearson`, `gradient`, `impurity`, and `split`.
 
 ## Run Tests
 
-Run the project test suite with:
+If you want to check that the solver logic is still working:
 
 ```bash
 uv run python run_tests.py
 ```
 
-The tests cover the core computations used by both the CLI and WebUI.
+## Exam Rules And Academic Integrity
+
+Please check the current EE2211 exam rules before using this in any exam.
+For my year, pre-written offline code / offline materials were allowed for the
+open-book Examplify exams, as long as they followed the stated restrictions.
+That does **not** automatically mean the same rules apply every year. The
+teaching team can change the policy, and your exam instructions are the source
+of truth.
+
+Before relying on this solver in an exam, confirm things like:
+
+- whether pre-coded scripts are allowed;
+- whether using code from others (e.g. from a public repository) is allowed.
+
+The solver itself, although coded partially by llm, does not need internet access, nor does it use any local llm based tools.
+
+Use the repo responsibly. It is a study and calculation helper, not permission
+to ignore course or exam rules.
+
+## License
+
+This project is released under the MIT License. See [LICENSE](LICENSE).
+
+That means you can use, modify, and share it, but it is provided as-is with no
+warranty. The authors are not responsible for misuse, wrong answers, rule
+violations, or any consequences from using it in a setting where it is not
+allowed.
