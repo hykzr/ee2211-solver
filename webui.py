@@ -886,7 +886,6 @@ def matrix_input(label, key, default="", allow_mixed=False):
     st.form_submit_button(
         f"Transpose {label}",
         key=f"{key}_transpose",
-        disabled=value is None,
         on_click=transpose_matrix_input,
         args=(raw_key, allow_mixed),
         width="stretch",
