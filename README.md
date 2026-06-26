@@ -1,6 +1,7 @@
 # EE2211 Solver
 
-![EE2211 Solver cover](images/cover.png)
+[![EE2211 Solver cover](images/cover.png)](https://youtu.be/58JrtpwjFVY)
+(click the image to watch the [demo video](https://youtu.be/58JrtpwjFVY), or try webui app [on streamlit](https://nus-ee2211-solver-hy.streamlit.app/))
 
 EE2211 Solver is a small helper app I made for working through EE2211-style
 machine learning calculation questions faster.
@@ -29,50 +30,150 @@ you prefer command line tools, but beginners should start with the WebUI.
 
 ## Beginner Setup
 
-You do not need to be good at Python to run this. You mainly need to install one
-tool called `uv`, then copy-paste a few commands.
+You do not need to be good at Python to run this.
 
-### 0. Install python
+The easiest option is to use the hosted WebUI:
+[nus-ee2211-solver-hy.streamlit.app](https://nus-ee2211-solver-hy.streamlit.app/)
 
-### 1. Install `uv`
+If you want to run it on your own computer offline, the simplest local setup is:
 
-If you already have `uv`, skip this step.
+1. install Python;
+2. clone this repo;
+3. install the dependencies;
+4. start Streamlit.
 
-[Installing uv](https://docs.astral.sh/uv/getting-started/installation/)
+Virtual environments and `uv` are both optional. They are useful if you already
+use them, but you can skip them at first.
 
-### 2. Clone This Repo
+### 0. Install Python
+
+Install Python 3.11 or newer from
+[python.org](https://www.python.org/downloads/).
+
+After installing, check that Python works:
 
 ```bash
-git clone https://github.com/hykzr/demo-video-recorder.git
-cd demo-video-recorder
+python --version
 ```
 
-### 3. Install The App Dependencies
+If that command does not work on macOS or Linux, try:
+
+```bash
+python3 --version
+```
+
+On Windows, try:
+
+```powershell
+py --version
+```
+
+### 1. Clone This Repo
+
+```bash
+git clone https://github.com/hykzr/ee2211-solver.git
+cd ee2211-solver
+```
+
+### 2. Install The App Dependencies
+
+Run this from inside the `ee2211-solver` folder:
+
+```bash
+python -m pip install -e .
+```
+
+If you used `python3` or `py` when checking your Python version, use the same
+command here:
+
+```bash
+python3 -m pip install -e .
+```
+
+```powershell
+py -m pip install -e .
+```
+
+This may take a little while the first time. It installs the Python packages the solver needs.
+
+If Python says the environment is externally managed, use the optional virtual environment setup below, then run the install command again.
+
+### 3. Start The WebUI
 
 Run:
 
 ```bash
-uv sync
+python -m streamlit run webui.py
 ```
 
-This may take a little while the first time. It installs the Python packages the
-solver needs.
-
-### 4. Start The WebUI
-
-Run:
+Again, if you used `python3` or `py` above, use that instead:
 
 ```bash
-uv run streamlit run webui.py
+python3 -m streamlit run webui.py
+```
+
+```powershell
+py -m streamlit run webui.py
 ```
 
 Streamlit will print a local link, usually something like:
 
 ```text
-http://localhost:8501
+2026-06-26 23:28:29.624 Uvicorn server started on 0.0.0.0:8501
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://...:8501
+  
+  For better performance, install the Watchdog module:
+  ...
 ```
 
-Open that link in your browser. That is the solver.
+Open that link after `Local URL:` in your browser (for the example above, the link to copy is `http://localhost:8501`). It may take some seconds for the web page to load
+
+### Optional: Use A Virtual Environment
+
+A virtual environment keeps this app's Python packages separate from your other
+Python projects. You do not need one just to try the solver, but it is a tidy
+habit if you install a lot of Python tools.
+
+On macOS or Linux, run:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+If `python` does not work, use `python3` instead:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+On Windows PowerShell, run:
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+After activation, your terminal prompt may show `(.venv)`.
+
+Then go back to step 2 and install the dependencies.
+
+### Optional: Use `uv` Instead
+
+If you already have `uv`, you can let it manage setup for you:
+
+```bash
+uv sync
+uv run streamlit run webui.py
+```
+
+If you do not have `uv` and want to try it, see the
+[uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 
 ## How To Type Matrices
 
@@ -114,11 +215,15 @@ folder is ignored by Git.
 
 ## Optional: Terminal Version
 
-If you prefer a text menu instead of the browser app, run:
+If you prefer a text menu instead of the browser app, run this from the repo
+folder after installing the dependencies:
 
 ```bash
-uv run python main.py
+python main.py
 ```
+
+If you used `python3` or `py` during setup, use that instead.
+With `uv`, run `uv run python main.py` instead.
 
 You can choose menu items by number, or use shortcuts like `linear`, `ridge`,
 `pearson`, `gradient`, `impurity`, and `split`.
@@ -128,8 +233,11 @@ You can choose menu items by number, or use shortcuts like `linear`, `ridge`,
 If you want to check that the solver logic is still working:
 
 ```bash
-uv run python run_tests.py
+python run_tests.py
 ```
+
+If you used `python3` or `py` during setup, use that instead.
+With `uv`, run `uv run python run_tests.py` instead.
 
 ## Exam Rules And Academic Integrity
 
