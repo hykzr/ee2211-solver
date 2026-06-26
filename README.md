@@ -3,16 +3,14 @@
 [![EE2211 Solver cover](images/cover.png)](https://youtu.be/58JrtpwjFVY)
 (click the image to watch the [demo video](https://youtu.be/58JrtpwjFVY), or try webui app [on streamlit](https://nus-ee2211-solver-hy.streamlit.app/))
 
-EE2211 Solver is a small helper app I made for working through EE2211-style
-machine learning calculation questions faster.
+EE2211 Solver is a small helper app I made for working through EE2211 (Introduction to Machine Learning) from NUS (National University of Singapore) machine learning calculation questions.
 
-It is not meant to replace understanding the concepts. The goal is more like:
+The goal is like:
 let the app handle repeated matrix / regression / gradient / tree / clustering
-calculation steps, so you can spend more exam time thinking about what the
-question is actually asking.
+calculation steps, so you can spend more exam time thinking about conceptual questions.
 
 The main way to use it is the Streamlit WebUI. There is also a terminal menu if
-you prefer command line tools, but beginners should start with the WebUI.
+you prefer command line tools.
 
 ## What It Can Do
 
